@@ -8,6 +8,8 @@ window.currentVersion = null;
 window.latestVersion = null;
 window.latestStableVersion = null;
 window.latestBetaVersion = null;
+window.latestAlphaVersion = null;
+window.latestRcVersion = null;
 window.gitHubVersionList = null;
 window.serverInfo = {};
 window.serverSchema = {};
@@ -28,6 +30,7 @@ window.wSess = [];
 window.currentHyperionInstance = 0;
 window.currentHyperionInstanceName = "?";
 window.comps = [];
+window.defaultPasswordIsSet = null;
 tokenList = {};
 
 function initRestart()
@@ -42,7 +45,7 @@ function connectionLostDetection(type)
 {
 	if ( window.watchdog > 2 )
 	{
-		var interval_id = window.setInterval("", 9999); // Get a reference to the last
+		var interval_id = window.setInterval(function(){clearInterval(interval_id);}, 9999); // Get a reference to the last
 		for (var i = 1; i < interval_id; i++)
 			window.clearInterval(i);
 		if(type == 'restart')
@@ -73,8 +76,14 @@ function initWebSocket()
 	{
 		if (window.websocket == null)
 		{
-			window.jsonPort = (document.location.port == '') ? '80' : document.location.port;
-			window.websocket = new WebSocket('ws://'+document.location.hostname+":"+window.jsonPort);
+			window.jsonPort = '';
+			if(document.location.port == '' && document.location.protocol == "http:")
+				window.jsonPort = '80';
+			else if (document.location.port == '' && document.location.protocol == "https:")
+				window.jsonPort = '443';
+			else
+				window.jsonPort = document.location.port;	
+			window.websocket = (document.location.protocol == "https:") ? new WebSocket('wss://'+document.location.hostname+":"+window.jsonPort) : new WebSocket('ws://'+document.location.hostname+":"+window.jsonPort);
 
 			window.websocket.onopen = function (event) {
 				$(window.hyperion).trigger({type:"open"});
@@ -115,27 +124,31 @@ function initWebSocket()
 					var response = JSON.parse(event.data);
 					var success = response.success;
 					var cmd = response.command;
+					var tan = response.tan
 					if (success || typeof(success) == "undefined")
 					{
 						$(window.hyperion).trigger({type:"cmd-"+cmd, response:response});
 					}
 					else
 					{
-						var error = response.hasOwnProperty("error")? response.error : "unknown";
-						$(window.hyperion).trigger({type:"error",reason:error});
-						console.log("[window.websocket::onmessage] "+error)
+					    // skip tan -1 error handling
+					    if(tan != -1){
+					      var error = response.hasOwnProperty("error")? response.error : "unknown";
+					      $(window.hyperion).trigger({type:"error",reason:error});
+					      console.log("[window.websocket::onmessage] ",error)
+					    }
 					}
 				}
 				catch(exception_error)
 				{
 					$(window.hyperion).trigger({type:"error",reason:exception_error});
-					console.log("[window.websocket::onmessage] "+exception_error)
+					console.log("[window.websocket::onmessage] ",exception_error)
 				}
 			};
 
 			window.websocket.onerror = function (error) {
 				$(window.hyperion).trigger({type:"error",reason:error});
-				console.log("[window.websocket::onerror] "+error)
+				console.log("[window.websocket::onerror] ",error)
 			};
 		}
 	}
@@ -162,12 +175,80 @@ function sendToHyperion(command, subcommand, msg)
 	window.websocket.send('{"command":"'+command+'", "tan":'+window.wsTan+subcommand+msg+'}');
 }
 
+// Send a json message to Hyperion and wait for a matching response
+// A response matches, when command(+subcommand) of request and response is the same
+// command:    The string command
+// subcommand: The optional string subcommand
+// data:       The json data as Object
+// tan:        The optional tan, default 1. If the tan is -1, we skip global response error handling
+// Returns data of response or false if timeout
+async function sendAsyncToHyperion (command, subcommand, data, tan = 1) {
+  let obj = { command, tan }
+  if (subcommand) {Object.assign(obj, {subcommand})}
+  if (data) { Object.assign(obj, data) }
+
+  //if (process.env.DEV || sstore.getters['common/getDebugState']) console.log('SENDAS', obj)
+  return __sendAsync(obj)
+}
+
+// Send a json message to Hyperion and wait for a matching response
+// A response matches, when command(+subcommand) of request and response is the same
+// Returns data of response or false if timeout
+async function __sendAsync (data) {
+  return new Promise((resolve, reject) => {
+    let cmd = data.command
+    let subc = data.subcommand
+    let tan = data.tan;
+    if (subc)
+      cmd = `${cmd}-${subc}`
+
+    let func = (e) => {
+      let rdata;
+      try {
+        rdata = JSON.parse(e.data)
+      } catch (error) {
+        console.error("[window.websocket::onmessage] ",error)
+        resolve(false)
+      }
+      if (rdata.command == cmd && rdata.tan == tan) {
+        window.websocket.removeEventListener('message', func)
+        resolve(rdata)
+      }
+    }
+    // after 7 sec we resolve false
+    setTimeout(() => { window.websocket.removeEventListener('message', func); resolve(false) }, 7000)
+    window.websocket.addEventListener('message', func)
+    window.websocket.send(JSON.stringify(data) + '\n')
+  })
+}
+
 // -----------------------------------------------------------
 // wrapped server commands
 
-function requestAuthorization()
+// Test if admin requires authentication
+function requestRequiresAdminAuth()
 {
-	sendToHyperion("authorize","login",'"username": "Hyperion", "password": "hyperion"');
+	sendToHyperion("authorize","adminRequired");
+}
+// Test if the default password needs to be changed
+function requestRequiresDefaultPasswortChange()
+{
+	sendToHyperion("authorize","newPasswordRequired");
+}
+// Change password
+function requestChangePassword(oldPw, newPw)
+{
+	sendToHyperion("authorize","newPassword",'"password": "'+oldPw+'", "newPassword":"'+newPw+'"');
+}
+
+function requestAuthorization(password)
+{
+	sendToHyperion("authorize","login",'"password": "' + password + '"');
+}
+
+function requestTokenAuthorization(token)
+{
+	sendToHyperion("authorize","login",'"token": "' + token + '"');
 }
 
 function requestToken(comment)
@@ -178,6 +259,10 @@ function requestToken(comment)
 function requestTokenInfo()
 {
 	sendToHyperion("authorize","getTokenList","");
+}
+
+function requestGetPendingTokenRequests (id, state) {
+	sendToHyperion("authorize", "getPendingTokenRequests", "");
 }
 
 function requestHandleTokenRequest(id, state)
@@ -290,9 +375,9 @@ function requestSetColor(r,g,b,duration)
 	sendToHyperion("color", "",  '"color":['+r+','+g+','+b+'], "priority":'+window.webPrio+',"duration":'+validateDuration(duration)+',"origin":"'+window.webOrigin+'"');
 }
 
-function requestSetImage(data,width,height,duration)
+function requestSetImage(data,duration,name)
 {
-	sendToHyperion("image", "",  '"imagedata":"'+data+'", "imagewidth":'+width+',"imageheight":'+height+', "priority":'+window.webPrio+',"duration":'+validateDuration(duration)+'');
+	sendToHyperion("image", "",  '"imagedata":"'+data+'", "priority":'+window.webPrio+',"duration":'+validateDuration(duration)+', "format":"auto", "origin":"'+window.webOrigin+'", "name":"'+name+'"');
 }
 
 function requestSetComponentState(comp, state)
@@ -368,3 +453,25 @@ function requestAdjustment(type, value, complete)
 	else
 		sendToHyperion("adjustment", "", '"adjustment": {"'+type+'": '+value+'}');
 }
+
+async function requestLedDeviceDiscovery(type, params)
+{
+	let data = { ledDeviceType: type, params: params };
+
+	return sendAsyncToHyperion("leddevice", "discover", data, Math.floor(Math.random() * 1000) );
+}
+
+async function requestLedDeviceProperties(type, params)
+{
+	let data = { ledDeviceType: type, params: params };
+
+	return sendAsyncToHyperion("leddevice", "getProperties", data, Math.floor(Math.random() * 1000));
+}
+
+function requestLedDeviceIdentification(type, params)
+{
+    //sendToHyperion("leddevice", "identify", '"ledDeviceType": "'+type+'","params": '+JSON.stringify(params)+'');
+    let data = { ledDeviceType: type, params: params };
+    return sendAsyncToHyperion("leddevice", "identify", data, Math.floor(Math.random() * 1000));
+}
+

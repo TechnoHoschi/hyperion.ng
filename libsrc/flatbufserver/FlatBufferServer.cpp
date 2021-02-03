@@ -1,9 +1,15 @@
 #include <flatbufserver/FlatBufferServer.h>
 #include "FlatBufferClient.h"
+#include "HyperionConfig.h"
 
 // util
 #include <utils/NetOrigin.h>
 #include <utils/GlobalSignals.h>
+
+// bonjour
+#ifdef ENABLE_AVAHI
+#include <bonjour/bonjourserviceregister.h>
+#endif
 
 // qt
 #include <QJsonObject>
@@ -35,7 +41,7 @@ void FlatBufferServer::initServer()
 	handleSettingsUpdate(settings::FLATBUFSERVER, _config);
 }
 
-void FlatBufferServer::handleSettingsUpdate(const settings::type& type, const QJsonDocument& config)
+void FlatBufferServer::handleSettingsUpdate(settings::type type, const QJsonDocument& config)
 {
 	if(type == settings::FLATBUFSERVER)
 	{
@@ -71,7 +77,6 @@ void FlatBufferServer::newConnection()
 				connect(client, &FlatBufferClient::clientDisconnected, this, &FlatBufferServer::clientDisconnected);
 				connect(client, &FlatBufferClient::registerGlobalInput, GlobalSignals::getInstance(), &GlobalSignals::registerGlobalInput);
 				connect(client, &FlatBufferClient::clearGlobalInput, GlobalSignals::getInstance(), &GlobalSignals::clearGlobalInput);
-				connect(client, &FlatBufferClient::clearAllGlobalInput, GlobalSignals::getInstance(), &GlobalSignals::clearAllGlobalInput);
 				connect(client, &FlatBufferClient::setGlobalInputImage, GlobalSignals::getInstance(), &GlobalSignals::setGlobalImage);
 				connect(client, &FlatBufferClient::setGlobalInputColor, GlobalSignals::getInstance(), &GlobalSignals::setGlobalColor);
 				connect(GlobalSignals::getInstance(), &GlobalSignals::globalRegRequired, client, &FlatBufferClient::registationRequired);
@@ -94,14 +99,27 @@ void FlatBufferServer::startServer()
 {
 	if(!_server->isListening())
 	{
-	    if(!_server->listen(QHostAddress::Any, _port))
-	    {
-	        Error(_log,"Failed to bind port %d", _port);
-	    }
-	    else
-	    {
-	        Info(_log,"Started on port %d", _port);
-	    }
+		if(!_server->listen(QHostAddress::Any, _port))
+		{
+			Error(_log,"Failed to bind port %d", _port);
+		}
+		else
+		{
+			Info(_log,"Started on port %d", _port);
+#ifdef ENABLE_AVAHI
+			if(_serviceRegister == nullptr)
+			{
+				_serviceRegister = new BonjourServiceRegister(this);
+				_serviceRegister->registerService("_hyperiond-flatbuf._tcp", _port);
+			}
+			else if(_serviceRegister->getPort() != _port)
+			{
+				delete _serviceRegister;
+				_serviceRegister = new BonjourServiceRegister(this);
+				_serviceRegister->registerService("_hyperiond-flatbuf._tcp", _port);
+			}
+#endif
+		}
 	}
 }
 

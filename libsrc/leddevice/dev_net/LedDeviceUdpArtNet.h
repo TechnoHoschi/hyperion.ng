@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LEDEVICEUDPARTNET_H
+#define LEDEVICEUDPARTNET_H
 
 // hyperion includes
 #include "ProviderUdp.h"
@@ -13,16 +14,15 @@
  *
  **/
 
-#define ArtNet_DEFAULT_PORT	5568
-
-#define DMX_MAX			512        // 512 usable slots
+const int DMX_MAX = 512; // 512 usable slots
 
 // http://stackoverflow.com/questions/16396013/artnet-packet-structure
 typedef union
 {
+#pragma pack(push, 1)
 	struct {
 		char		ID[8];		// "Art-Net"
-		uint16_t	OpCode;		// See Doc. Table 1 - OpCodes eg. 0x5000 OpOutput / OpDmx
+		uint16_t	OpCode;		// See Doc. Table 1 - OpCodes e.g. 0x5000 OpOutput / OpDmx
 		uint16_t	ProtVer;	// 0x0e00 (aka 14)
 		uint8_t		Sequence;	// monotonic counter
 		uint8_t		Physical;	// 0x00
@@ -30,50 +30,62 @@ typedef union
 		uint8_t		Net;		// high universe (not used)
 		uint16_t	Length;		// data length (2 - 512)
 		uint8_t		Data[ DMX_MAX ];	// universe data
-	} __attribute__((packed));
+	};
+#pragma pack(pop)
 
 	uint8_t raw[ 18 + DMX_MAX ];
 
 } artnet_packet_t;
 
 ///
-/// Implementation of the LedDevice interface for sending led colors via udp/E1.31 packets
+/// Implementation of the LedDevice interface for sending LED colors to an Art-Net LED-device via UDP
 ///
 class LedDeviceUdpArtNet : public ProviderUdp
 {
 public:
-	///
-	/// Constructs specific LedDevice
-	///
-	/// @param deviceConfig json device config
-	///
-	LedDeviceUdpArtNet(const QJsonObject &deviceConfig);
 
 	///
-	/// Sets configuration
+	/// @brief Constructs an Art-Net LED-device fed via UDP
 	///
-	/// @param deviceConfig the json device config
-	/// @return true if success
-	bool init(const QJsonObject &deviceConfig);
+	/// @param deviceConfig Device's configuration as JSON-Object
+	///
+	explicit LedDeviceUdpArtNet(const QJsonObject &deviceConfig);
 
-	/// constructs leddevice
+	///
+	/// @brief Constructs the LED-device
+	///
+	/// @param[in] deviceConfig Device's configuration as JSON-Object
+	/// @return LedDevice constructed
+	///
 	static LedDevice* construct(const QJsonObject &deviceConfig);
 
-
 private:
-	///
-	/// Writes the led color values to the led-device
-	///
-	/// @param ledValues The color-value per led
-	/// @return Zero on succes else negative
-	///
-	virtual int write(const std::vector<ColorRgb> &ledValues);
 
-	void prepare(const unsigned this_universe, const unsigned this_sequence, const unsigned this_dmxChannelCount);
+	///
+	/// @brief Initialise the device's configuration
+	///
+	/// @param[in] deviceConfig the JSON device configuration
+	/// @return True, if success
+	///
+	bool init(const QJsonObject &deviceConfig) override;
 
+	///
+	/// @brief Writes the RGB-Color values to the LEDs.
+	///
+	/// @param[in] ledValues The RGB-color per LED
+	/// @return Zero on success, else negative
+	///
+	int write(const std::vector<ColorRgb> & ledValues) override;
+
+	///
+	/// @brief Generate Art-Net communication header
+	///
+	void prepare(unsigned this_universe, unsigned this_sequence, unsigned this_dmxChannelCount);
 
 	artnet_packet_t artnet_packet;
 	uint8_t _artnet_seq = 1;
-	uint8_t _artnet_channelsPerFixture = 3;
-	unsigned _artnet_universe = 1;
+	int _artnet_channelsPerFixture = 3;
+	int _artnet_universe = 1;
 };
+
+#endif // LEDEVICEUDPARTNET_H

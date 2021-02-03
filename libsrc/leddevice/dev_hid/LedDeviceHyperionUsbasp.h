@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LEDEVICEHYPERIONUSBASP_H
+#define LEDEVICEHYPERIONUSBASP_H
 
 // stl includes
 #include <vector>
@@ -27,14 +28,14 @@ public:
 	///
 	/// @param deviceConfig json device config
 	///
-	LedDeviceHyperionUsbasp(const QJsonObject &deviceConfig);
+	explicit LedDeviceHyperionUsbasp(const QJsonObject &deviceConfig);
 
 	///
 	/// Sets configuration
 	///
-	/// @param deviceConfig the json device config
+	/// @para#endif // LEDEVICETEMPLATE_Hm deviceConfig the json device config
 	/// @return true if success
-	bool init(const QJsonObject &deviceConfig);
+	bool init(const QJsonObject &deviceConfig) override;
 
 	/// constructs leddevice
 	static LedDevice* construct(const QJsonObject &deviceConfig);
@@ -42,16 +43,23 @@ public:
 	///
 	/// Destructor of the LedDevice; closes the output device if it is open
 	///
-	virtual ~LedDeviceHyperionUsbasp();
+	~LedDeviceHyperionUsbasp() override;
 
+public slots:
+	///
+	/// Closes the output device.
+	/// Includes switching-off the device and stopping refreshes
+	///
+	int close() override;
+
+protected:
 	///
 	/// Opens and configures the output device
 	///
 	/// @return Zero on succes else negative
 	///
-	int open();
+	int open() override;
 
-protected:
 	///
 	/// Writes the RGB-Color values to the leds.
 	///
@@ -59,7 +67,7 @@ protected:
 	///
 	/// @return Zero on success else negative
 	///
-	virtual int write(const std::vector<ColorRgb>& ledValues);
+	int write(const std::vector<ColorRgb>& ledValues) override;
 
 	///
 	/// Test if the device is a Hyperion Usbasp device
@@ -78,11 +86,11 @@ protected:
 	/// libusb context
 	libusb_context * _libusbContext;
 
+	/// libusb device
+	libusb_device * _device;
+
 	/// libusb device handle
 	libusb_device_handle * _deviceHandle;
-
-	/// Usb device identifiers
-	static uint16_t     _usbVendorId;
-	static uint16_t     _usbProductId;
-	static QString      _usbProductDescription;
 };
+
+#endif // LEDEVICEHYPERIONUSBASP_H

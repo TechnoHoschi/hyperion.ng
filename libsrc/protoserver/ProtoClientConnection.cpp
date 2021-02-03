@@ -7,9 +7,9 @@
 #include <QTimer>
 #include <QRgb>
 
-// TODO Remove this class if third-party apps have been migrated (eg. Hyperion Android Gabber, Windows Screen grabber etc.)
+// TODO Remove this class if third-party apps have been migrated (eg. Hyperion Android Grabber, Windows Screen grabber etc.)
 
-ProtoClientConnection::ProtoClientConnection(QTcpSocket* socket, const int &timeout, QObject *parent)
+ProtoClientConnection::ProtoClientConnection(QTcpSocket* socket, int timeout, QObject *parent)
 	: QObject(parent)
 	, _log(Logger::getInstance("PROTOSERVER"))
 	, _socket(socket)
@@ -119,10 +119,7 @@ void ProtoClientConnection::handleColorCommand(const proto::ColorRequest &messag
 	// extract parameters
 	int priority = message.priority();
 	int duration = message.has_duration() ? message.duration() : -1;
-	ColorRgb color;
-	color.red = qRed(message.rgbcolor());
-	color.green = qGreen(message.rgbcolor());
-	color.blue = qBlue(message.rgbcolor());
+	std::vector<ColorRgb> color{ ColorRgb{ uint8_t(qRed(message.rgbcolor())), uint8_t(qGreen(message.rgbcolor())), uint8_t(qBlue(message.rgbcolor())) } };
 
 	if (priority < 100 || priority >= 200)
 	{
@@ -202,7 +199,7 @@ void ProtoClientConnection::handleClearCommand(const proto::ClearRequest &messag
 void ProtoClientConnection::handleClearallCommand()
 {
 	// clear all priority
-	emit clearAllGlobalInput();
+	emit clearGlobalInput(-1);
 
 	// send reply
 	sendSuccessReply();
@@ -217,7 +214,7 @@ void ProtoClientConnection::handleNotImplemented()
 void ProtoClientConnection::sendMessage(const google::protobuf::Message &message)
 {
 	std::string serializedReply = message.SerializeAsString();
-	uint32_t size = serializedReply.size();
+	uint32_t size = static_cast<uint32_t>(serializedReply.size());
 	uint8_t sizeData[] = {uint8_t(size >> 24), uint8_t(size >> 16), uint8_t(size >> 8), uint8_t(size)};
 	_socket->write((const char *) sizeData, sizeof(sizeData));
 	_socket->write(serializedReply.data(), serializedReply.length());

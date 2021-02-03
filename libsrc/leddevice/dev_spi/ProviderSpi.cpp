@@ -1,4 +1,4 @@
-
+﻿
 // STL includes
 #include <cstring>
 #include <cstdio>
@@ -7,15 +7,15 @@
 
 // Linux includes
 #include <fcntl.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 
 // Local Hyperion includes
 #include "ProviderSpi.h"
 #include <utils/Logger.h>
 
-
-ProviderSpi::ProviderSpi()
-	: LedDevice()
+ProviderSpi::ProviderSpi(const QJsonObject &deviceConfig)
+	: LedDevice(deviceConfig)
 	, _deviceName("/dev/spidev0.0")
 	, _baudRate_Hz(1000000)
 	, _fid(-1)
@@ -28,25 +28,33 @@ ProviderSpi::ProviderSpi()
 
 ProviderSpi::~ProviderSpi()
 {
-//	close(_fid);
 }
 
 bool ProviderSpi::init(const QJsonObject &deviceConfig)
 {
-	LedDevice::init(deviceConfig);
+	bool isInitOK = false;
 
-	_deviceName    = deviceConfig["output"].toString(_deviceName);
-	_baudRate_Hz   = deviceConfig["rate"].toInt(_baudRate_Hz);
-	_spiMode       = deviceConfig["spimode"].toInt(_spiMode);
-	_spiDataInvert = deviceConfig["invert"].toBool(_spiDataInvert);
-	
-	return true;
+	// Initialise sub-class
+	if ( LedDevice::init(deviceConfig) )
+	{
+		_deviceName    = deviceConfig["output"].toString(_deviceName);
+		_baudRate_Hz   = deviceConfig["rate"].toInt(_baudRate_Hz);
+		_spiMode       = deviceConfig["spimode"].toInt(_spiMode);
+		_spiDataInvert = deviceConfig["invert"].toBool(_spiDataInvert);
+
+		Debug(_log, "_baudRate_Hz [%d], _latchTime_ms [%d]", _baudRate_Hz, _latchTime_ms);
+		Debug(_log, "_spiDataInvert [%d], _spiMode [%d]", _spiDataInvert, _spiMode);
+
+		isInitOK = true;
+	}
+	return isInitOK;
 }
 
 int ProviderSpi::open()
 {
-	Debug(_log, "_baudRate_Hz %d,  _latchTime_ns %d", _baudRate_Hz, _latchTime_ms);
-	Debug(_log, "_spiDataInvert %d,  _spiMode %d", _spiDataInvert, _spiMode);
+	int retval = -1;
+	QString errortext;
+	_isDeviceReady = false;
 
 	const int bitsPerWord = 8;
 
@@ -54,29 +62,69 @@ int ProviderSpi::open()
 
 	if (_fid < 0)
 	{
-		Error( _log, "Failed to open device (%s). Error message: %s", QSTRING_CSTR(_deviceName),  strerror(errno) );
-		return -1;
+		errortext = QString ("Failed to open device (%1). Error message: %2").arg(_deviceName, strerror(errno));
+		retval = -1;
 	}
-
-	if (ioctl(_fid, SPI_IOC_WR_MODE, &_spiMode) == -1 || ioctl(_fid, SPI_IOC_RD_MODE, &_spiMode) == -1)
+	else
 	{
-		return -2;
+		if (ioctl(_fid, SPI_IOC_WR_MODE, &_spiMode) == -1 || ioctl(_fid, SPI_IOC_RD_MODE, &_spiMode) == -1)
+		{
+			retval = -2;
+		}
+		else
+		{
+			if (ioctl(_fid, SPI_IOC_WR_BITS_PER_WORD, &bitsPerWord) == -1 || ioctl(_fid, SPI_IOC_RD_BITS_PER_WORD, &bitsPerWord) == -1)
+			{
+				retval = -4;
+			}
+			else
+			{
+				if (ioctl(_fid, SPI_IOC_WR_MAX_SPEED_HZ, &_baudRate_Hz) == -1 || ioctl(_fid, SPI_IOC_RD_MAX_SPEED_HZ, &_baudRate_Hz) == -1)
+				{
+					retval = -6;
+				}
+				else
+				{
+					// Everything OK -> enable device
+					_isDeviceReady = true;
+					retval = 0;
+				}
+			}
+		}
+		if ( retval < 0 )
+		{
+			errortext = QString ("Failed to open device (%1). Error Code: %2").arg(_deviceName).arg(retval);
+		}
 	}
 
-	if (ioctl(_fid, SPI_IOC_WR_BITS_PER_WORD, &bitsPerWord) == -1 || ioctl(_fid, SPI_IOC_RD_BITS_PER_WORD, &bitsPerWord) == -1)
+	if ( retval < 0 )
 	{
-		return -4;
+		this->setInError( errortext );
 	}
 
-	if (ioctl(_fid, SPI_IOC_WR_MAX_SPEED_HZ, &_baudRate_Hz) == -1 || ioctl(_fid, SPI_IOC_RD_MAX_SPEED_HZ, &_baudRate_Hz) == -1)
-	{
-		return -6;
-	}
-
-	return 0;
+	return retval;
 }
 
-int ProviderSpi::writeBytes(const unsigned size, const uint8_t * data)
+int ProviderSpi::close()
+{
+	// LedDevice specific closing activities
+	int retval = 0;
+	_isDeviceReady = false;
+
+	// Test, if device requires closing
+	if ( _fid > -1 )
+	{
+		// Close device
+		if ( ::close(_fid) != 0 )
+		{
+			Error( _log, "Failed to close device (%s). Error message: %s", QSTRING_CSTR(_deviceName),  strerror(errno) );
+			retval = -1;
+		}
+	}
+	return retval;
+}
+
+int ProviderSpi::writeBytes(unsigned size, const uint8_t * data)
 {
 	if (_fid < 0)
 	{

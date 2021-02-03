@@ -1,14 +1,16 @@
 #!/bin/bash
 
 # detect CI
-if [ -n "${TRAVIS-}" ]; then
-	# Travis-CI
-	CI_NAME="$(echo "$TRAVIS_OS_NAME" | tr '[:upper:]' '[:lower:]')"
-	CI_BUILD_DIR="$TRAVIS_BUILD_DIR"
-elif [ "$SYSTEM_COLLECTIONID" != "" ]; then
+if [ "$SYSTEM_COLLECTIONID" != "" ]; then
 	# Azure Pipelines
+	echo "Azure detected"
 	CI_NAME="$(echo "$AGENT_OS" | tr '[:upper:]' '[:lower:]')"
 	CI_BUILD_DIR="$BUILD_SOURCESDIRECTORY"
+elif [ "$HOME" != "" ]; then
+	# GitHub Actions
+	echo "Github Actions detected"
+	CI_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	CI_BUILD_DIR="$GITHUB_WORKSPACE"
 else
 	# for executing in non ci environment
 	CI_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -18,7 +20,7 @@ fi
 [ -z "${BUILD_TYPE}" ] && BUILD_TYPE="Debug"
 
 # Determine cmake build type; tag builds are Release, else Debug (-dev appends to platform)
-if [[ $BUILD_SOURCEBRANCH == *"refs/tags"* ]]; then
+if [[ $BUILD_SOURCEBRANCH == *"refs/tags"* || $GITHUB_REF == *"refs/tags"* ]]; then
 	BUILD_TYPE=Release
 else
 	PLATFORM=${PLATFORM}-dev
@@ -34,8 +36,19 @@ if [[ "$CI_NAME" == 'osx' || "$CI_NAME" == 'darwin' ]]; then
 	cd ${CI_BUILD_DIR} && source /${CI_BUILD_DIR}/test/testrunner.sh || exit 4
 	exit 0;
 	exit 1 || { echo "---> Hyperion compilation failed! Abort"; exit 5; }
+elif [[ $CI_NAME == *"mingw64_nt"* || "$CI_NAME" == 'windows_nt' ]]; then
+	# compile prepare
+	echo "Number of Cores $NUMBER_OF_PROCESSORS"
+	mkdir build || exit 1
+	cd build
+	cmake -G "Visual Studio 16 2019" -A x64 -DPLATFORM=${PLATFORM} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../ || exit 2
+	cmake --build . --target package --config Release -- -nologo -v:m -maxcpucount || exit 3
+	exit 0;
+	exit 1 || { echo "---> Hyperion compilation failed! Abort"; exit 5; }
 elif [[ "$CI_NAME" == 'linux' ]]; then
-	echo "Compile Hyperion with DOCKER_TAG = ${DOCKER_TAG} and friendly name DOCKER_NAME = ${DOCKER_NAME}"
+	echo "Compile Hyperion with DOCKER_IMAGE = ${DOCKER_IMAGE}, DOCKER_TAG = ${DOCKER_TAG} and friendly name DOCKER_NAME = ${DOCKER_NAME}"
+	# set GitHub Container Registry url
+	REGISTRY_URL="ghcr.io/hyperion-project/${DOCKER_IMAGE}"
 	# take ownership of deploy dir
 	mkdir ${CI_BUILD_DIR}/deploy
 
@@ -43,14 +56,14 @@ elif [[ "$CI_NAME" == 'linux' ]]; then
 	docker run --rm \
 		-v "${CI_BUILD_DIR}/deploy:/deploy" \
 		-v "${CI_BUILD_DIR}:/source:ro" \
-		hyperionproject/hyperion-ci:$DOCKER_TAG \
-		/bin/bash -c "mkdir hyperion.ng && cp -r source/. /hyperion.ng &&
-		cd /hyperion.ng && mkdir build && cd build &&
-		cmake -DPLATFORM=${PLATFORM} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DDOCKER_PLATFORM=${DOCKER_TAG} ../ || exit 2 &&
+		$REGISTRY_URL:$DOCKER_TAG \
+		/bin/bash -c "mkdir hyperion && cp -r source/. /hyperion &&
+		cd /hyperion && mkdir build && cd build &&
+		cmake -DPLATFORM=${PLATFORM} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../ || exit 2 &&
 		make -j $(nproc) package || exit 3 &&
-		cp /hyperion.ng/build/bin/h* /deploy/ 2>/dev/null || : &&
-		cp /hyperion.ng/build/Hyperion.NG-* /deploy/ 2>/dev/null || : &&
-		cd /hyperion.ng && source /hyperion.ng/test/testrunner.sh || exit 4 &&
+		cp /hyperion/build/bin/h* /deploy/ 2>/dev/null || : &&
+		cp /hyperion/build/Hyperion-* /deploy/ 2>/dev/null || : &&
+		cd /hyperion && source /hyperion/test/testrunner.sh || exit 4 &&
 		exit 0;
 		exit 1 " || { echo "---> Hyperion compilation failed! Abort"; exit 5; }
 

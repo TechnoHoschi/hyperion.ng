@@ -1,82 +1,64 @@
 {
-	"type":"array",
-	"required":true,
-	"minItems":1,
-	"items":
-	{
-		"type":"object",
-		"required" : true,
-		"properties":
-		{
-			"index":
-			{
-				"type":"integer",
-				"required":true,
-				"default" : 0
+	"type": "array",
+	"required": true,
+	"minItems": 1,
+	"items": {
+		"type": "object",
+		"required": true,
+		"properties": {
+			"hmin": {
+				"type": "number",
+				"minimum": 0,
+				"maximum": 1,
+				"required": true,
+				"default": 0
 			},
-			"clone":
-			{
-				"type":"integer"
+			"hmax": {
+				"type": "number",
+				"minimum": 0,
+				"maximum": 1,
+				"required": true,
+				"default": 0.1
 			},
-			"hscan":
-			{
-				"type":"object",
-				"required" : true,
-				"properties":
-				{
-					"minimum":
-					{
-						"type":"number",
-						"minimum" : 0,
-						"maximum" : 1,
-						"required":true,
-						"default" : 0
-					},
-					"maximum":
-					{
-						"type":"number",
-						"minimum" : 0,
-						"maximum" : 1,
-						"required":true,
-						"default" : 0.1
-					}
-				},
-				"additionalProperties" : false
+			"vmin": {
+				"type": "number",
+				"minimum": 0,
+				"maximum": 1,
+				"required": true,
+				"default": 0
 			},
-			"vscan":
-			{
-				"type":"object",
-				"required" : true,
-				"properties":
-				{
-					"minimum":
-					{
-						"type":"number",
-						"minimum" : 0,
-						"maximum" : 1,
-						"required":true,
-						"default" : 0
-					},
-					"maximum":
-					{
-						"type":"number",
-						"minimum" : 0,
-						"maximum" : 1,
-						"required":true,
-						"default" : 0.1
-					}
-				},
-				"additionalProperties" : false
+			"vmax": {
+				"type": "number",
+				"minimum": 0,
+				"maximum": 1,
+				"required": true,
+				"default": 0.1
 			},
-			"colorOrder":
-			{
+			"colorOrder": {
 				"type": "string",
-				"enum" : ["rgb", "bgr", "rbg", "brg", "gbr", "grb"],
-				"options" : {
-					"enum_titles" : ["edt_conf_enum_rgb", "edt_conf_enum_bgr", "edt_conf_enum_rbg", "edt_conf_enum_brg", "edt_conf_enum_gbr", "edt_conf_enum_grb"]
+				"enum": [
+					"rgb",
+					"bgr",
+					"rbg",
+					"brg",
+					"gbr",
+					"grb"
+				],
+				"options": {
+					"enum_titles": [
+						"edt_conf_enum_rgb",
+						"edt_conf_enum_bgr",
+						"edt_conf_enum_rbg",
+						"edt_conf_enum_brg",
+						"edt_conf_enum_gbr",
+						"edt_conf_enum_grb"
+					]
 				}
+			},
+			"name": {
+				"type": "string"
 			}
 		},
-		"additionalProperties" : false
+		"additionalProperties": false
 	}
 }

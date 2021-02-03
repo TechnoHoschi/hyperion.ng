@@ -1,9 +1,8 @@
 #include "LedDeviceLpd6803.h"
 
 LedDeviceLpd6803::LedDeviceLpd6803(const QJsonObject &deviceConfig)
-	: ProviderSpi()
+	: ProviderSpi(deviceConfig)
 {
-	_deviceReady = init(deviceConfig);
 }
 
 LedDevice* LedDeviceLpd6803::construct(const QJsonObject &deviceConfig)
@@ -13,13 +12,18 @@ LedDevice* LedDeviceLpd6803::construct(const QJsonObject &deviceConfig)
 
 bool LedDeviceLpd6803::init(const QJsonObject &deviceConfig)
 {
-	ProviderSpi::init(deviceConfig);
+	bool isInitOK = false;
 
-	unsigned messageLength = 4 + 2*_ledCount + _ledCount/8 + 1;
-	// Initialise the buffer
-	_ledBuffer.resize(messageLength, 0x00);
-	
-	return true;
+	// Initialise sub-class
+	if ( ProviderSpi::init(deviceConfig) )
+	{
+		unsigned messageLength = 4 + 2*_ledCount + _ledCount/8 + 1;
+		// Initialise the buffer
+		_ledBuffer.resize(messageLength, 0x00);
+
+		isInitOK = true;
+	}
+	return isInitOK;
 }
 
 int LedDeviceLpd6803::write(const std::vector<ColorRgb> &ledValues)

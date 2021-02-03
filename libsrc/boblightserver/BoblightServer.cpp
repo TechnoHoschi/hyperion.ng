@@ -28,9 +28,9 @@ BoblightServer::BoblightServer(Hyperion* hyperion,const QJsonDocument& config)
 	Debug(_log, "Instance created");
 
 	// listen for component change
-	connect(_hyperion, SIGNAL(componentStateChanged(hyperion::Components,bool)), this, SLOT(componentStateChanged(hyperion::Components,bool)));
+	connect(_hyperion, &Hyperion::compStateChangeRequest, this, &BoblightServer::compStateChangeRequest);
 	// listen new connection signal from server
-	connect(_server, SIGNAL(newConnection()), this, SLOT(newConnection()));
+	connect(_server, &QTcpServer::newConnection, this, &BoblightServer::newConnection);
 
 	// init
 	handleSettingsUpdate(settings::BOBLSERVER, config);
@@ -51,7 +51,7 @@ void BoblightServer::start()
 
 	Info(_log, "Started on port %d", _port);
 
-	_hyperion->getComponentRegister().componentStateChanged(COMP_BOBLIGHTSERVER, _server->isListening());
+	_hyperion->setNewComponentState(COMP_BOBLIGHTSERVER, _server->isListening());
 }
 
 void BoblightServer::stop()
@@ -59,21 +59,20 @@ void BoblightServer::stop()
 	if ( ! _server->isListening() )
 		return;
 
-	foreach (BoblightClientConnection * connection, _openConnections) {
-		delete connection;
-	}
+	qDeleteAll(_openConnections);
+
 	_server->close();
 
 	Info(_log, "Stopped");
-	_hyperion->getComponentRegister().componentStateChanged(COMP_BOBLIGHTSERVER, _server->isListening());
+	_hyperion->setNewComponentState(COMP_BOBLIGHTSERVER, _server->isListening());
 }
 
-bool BoblightServer::active()
+bool BoblightServer::active() const
 {
 	return _server->isListening();
 }
 
-void BoblightServer::componentStateChanged(const hyperion::Components component, bool enable)
+void BoblightServer::compStateChangeRequest(hyperion::Components component, bool enable)
 {
 	if (component == COMP_BOBLIGHTSERVER)
 	{
@@ -102,7 +101,7 @@ void BoblightServer::newConnection()
 		_openConnections.insert(connection);
 
 		// register slot for cleaning up after the connection closed
-		connect(connection, SIGNAL(connectionClosed(BoblightClientConnection*)), this, SLOT(closedConnection(BoblightClientConnection*)));
+		connect(connection, &BoblightClientConnection::connectionClosed, this, &BoblightServer::closedConnection);
 	}
 }
 
@@ -115,7 +114,7 @@ void BoblightServer::closedConnection(BoblightClientConnection *connection)
 	connection->deleteLater();
 }
 
-void BoblightServer::handleSettingsUpdate(const settings::type& type, const QJsonDocument& config)
+void BoblightServer::handleSettingsUpdate(settings::type type, const QJsonDocument& config)
 {
 	if(type == settings::BOBLSERVER)
 	{

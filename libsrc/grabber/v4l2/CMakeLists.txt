@@ -11,6 +11,8 @@ target_link_libraries(v4l2-grabber
 	${QT_LIBRARIES}
 )
 
-if (JPEG_FOUND)
+if(TURBOJPEG_FOUND)
+	target_link_libraries(v4l2-grabber ${TurboJPEG_LIBRARY})
+elseif (JPEG_FOUND)
 	target_link_libraries(v4l2-grabber ${JPEG_LIBRARY})
-endif()
+endif(TURBOJPEG_FOUND)

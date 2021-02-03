@@ -1,9 +1,8 @@
 #include "LedDeviceP9813.h"
 
 LedDeviceP9813::LedDeviceP9813(const QJsonObject &deviceConfig)
-	: ProviderSpi()
+	: ProviderSpi(deviceConfig)
 {
-	_deviceReady = init(deviceConfig);
 }
 
 LedDevice* LedDeviceP9813::construct(const QJsonObject &deviceConfig)
@@ -13,11 +12,15 @@ LedDevice* LedDeviceP9813::construct(const QJsonObject &deviceConfig)
 
 bool LedDeviceP9813::init(const QJsonObject &deviceConfig)
 {
-	ProviderSpi::init(deviceConfig);
+	bool isInitOK = false;
 
-	_ledBuffer.resize(_ledCount * 4 + 8, 0x00);
-	
-	return true;
+	// Initialise sub-class
+	if ( ProviderSpi::init(deviceConfig) )
+	{
+		_ledBuffer.resize(_ledCount * 4 + 8, 0x00);
+		isInitOK = true;
+	}
+	return isInitOK;
 }
 
 int LedDeviceP9813::write(const std::vector<ColorRgb> &ledValues)

@@ -15,10 +15,6 @@ RgbChannelAdjustment::RgbChannelAdjustment(uint8_t adjustR, uint8_t adjustG, uin
 	setAdjustment(adjustR, adjustG, adjustB);
 }
 
-RgbChannelAdjustment::~RgbChannelAdjustment()
-{
-}
-
 void RgbChannelAdjustment::resetInitialized()
 {
 	//Debug(_log, "initialize mapping with %d,%d,%d", _adjust[RED], _adjust[GREEN], _adjust[BLUE]);
@@ -58,9 +54,9 @@ void RgbChannelAdjustment::apply(uint8_t input, uint8_t brightness, uint8_t & re
 
 	if (!_initialized[input])
 	{
-		_mapping[RED  ][input] = qMin( ((_brightness * input * _adjust[RED  ]) / 65025), UINT8_MAX);
-		_mapping[GREEN][input] = qMin( ((_brightness * input * _adjust[GREEN]) / 65025), UINT8_MAX);
-		_mapping[BLUE ][input] = qMin( ((_brightness * input * _adjust[BLUE ]) / 65025), UINT8_MAX);
+		_mapping[RED  ][input] = qMin( ((_brightness * input * _adjust[RED  ]) / 65025), (int)UINT8_MAX);
+		_mapping[GREEN][input] = qMin( ((_brightness * input * _adjust[GREEN]) / 65025), (int)UINT8_MAX);
+		_mapping[BLUE ][input] = qMin( ((_brightness * input * _adjust[BLUE ]) / 65025), (int)UINT8_MAX);
 		_initialized[input] = true;
 	}
 	red   = _mapping[RED  ][input];

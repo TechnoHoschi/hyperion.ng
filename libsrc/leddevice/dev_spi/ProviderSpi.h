@@ -15,26 +15,33 @@ public:
 	///
 	/// Constructs specific LedDevice
 	///
-	ProviderSpi();
+	ProviderSpi(const QJsonObject &deviceConfig);
 
 	///
 	/// Sets configuration
 	///
 	/// @param deviceConfig the json device config
 	/// @return true if success
-	virtual bool init(const QJsonObject &deviceConfig);
+	bool init(const QJsonObject &deviceConfig) override;
 
 	///
 	/// Destructor of the LedDevice; closes the output device if it is open
 	///
-	virtual ~ProviderSpi();
+	~ProviderSpi() override;
 
 	///
 	/// Opens and configures the output device
 	///
 	/// @return Zero on succes else negative
 	///
-	int open();
+	int open() override;
+
+public slots:
+	///
+	/// Closes the output device.
+	/// Includes switching-off the device and stopping refreshes
+	///
+	int close() override;
 
 protected:
 	///
@@ -44,9 +51,9 @@ protected:
 	/// @param[in[ size The length of the data
 	/// @param[in] data The data
 	///
-	/// @return Zero on succes else negative
+	/// @return Zero on success, else negative
 	///
-	int writeBytes(const unsigned size, const uint8_t *data);
+	int writeBytes(unsigned size, const uint8_t *data);
 
 	/// The name of the output device
 	QString _deviceName;

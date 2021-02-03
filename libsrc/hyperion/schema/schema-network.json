@@ -25,6 +25,19 @@
 			},
 			"propertyOrder" : 2
 		},
+		"restirctedInternetAccessAPI" :
+		{
+			"type" : "boolean",
+			"title" : "edt_conf_net_restirctedInternetAccessAPI_title",
+			"required" : true,
+			"default" : false,
+			"options": {
+				"dependencies": {
+					"internetAccessAPI": true
+				}
+			},
+			"propertyOrder" : 3
+		},
 		"ipWhitelist" :
 		{
 			"type" : "array",
@@ -32,14 +45,15 @@
 			"required" : true,
 			"items" : {
 				"type": "string",
-				"title" : "edt_conf_net_ip_itemtitle"
+				"title" : "edt_conf_net_ip_itemtitle",
+				"allowEmptyArray" : true
 			},
 			"options": {
 				"dependencies": {
-					"internetAccessAPI": false
+					"restirctedInternetAccessAPI": true
 				}
 			},
-			"propertyOrder" : 3
+			"propertyOrder" : 4
 		},
 		"localApiAuth" :
 		{
@@ -52,7 +66,15 @@
 					"apiAuth": true
 				}
 			},
-			"propertyOrder" : 4
+			"propertyOrder" : 5
+		},
+		"localAdminAuth" :
+		{
+			"type" : "boolean",
+			"title" : "edt_conf_net_localAdminAuth_title",
+			"required" : true,
+			"default" : true,
+			"propertyOrder" : 5
 		}
 	},
 	"additionalProperties" : false

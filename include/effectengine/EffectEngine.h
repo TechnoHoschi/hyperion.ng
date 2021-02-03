@@ -27,33 +27,31 @@ class EffectEngine : public QObject
 
 public:
 	EffectEngine(Hyperion * hyperion);
-	virtual ~EffectEngine();
+	~EffectEngine() override;
 
-	const std::list<EffectDefinition> & getEffects() const { return _availableEffects; };
+	std::list<EffectDefinition> getEffects() const { return _availableEffects; }
 
-	const std::list<ActiveEffectDefinition> & getActiveEffects();
+	std::list<ActiveEffectDefinition> getActiveEffects() const;
 
 	///
 	/// Get available schemas from EffectFileHandler
 	/// @return all schemas
 	///
-	const std::list<EffectSchema> & getEffectSchemas();
+	std::list<EffectSchema> getEffectSchemas() const;
 
 	///
 	/// @brief Save an effect with EffectFileHandler
-	/// @param       obj       The effect args
-	/// @param[out] resultMsg  The feedback message
-	/// @return True on success else false
+	/// @param  obj   The effect args
+	/// @return If not empty, it contains the error
 	///
-	bool saveEffect(const QJsonObject& obj, QString& resultMsg);
+	QString saveEffect(const QJsonObject& obj);
 
 	///
 	/// @brief Delete an effect by name.
-	/// @param[in]  effectName  The effect name to delete
-	/// @param[out] resultMsg   The message on error
-	/// @return True on success else false
+	/// @param  effectName  The effect name to delete
+	/// @return If not empty, it contains the error
 	///
-	bool deleteEffect(const QString& effectName, QString& resultMsg);
+	QString deleteEffect(const QString& effectName);
 
 	///
 	/// @brief Get all init data of the running effects and stop them
@@ -116,8 +114,6 @@ private:
 	std::list<EffectDefinition> _availableEffects;
 
 	std::list<Effect *> _activeEffects;
-
-	std::list<ActiveEffectDefinition> _availableActiveEffects;
 
 	std::list<ActiveEffectDefinition> _cachedActiveEffects;
 

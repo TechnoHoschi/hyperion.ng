@@ -1,8 +1,29 @@
 var storedAccess;
 var storedLang;
-var availLang = ['en','de','es','it','cs'];
+var availLang = ['cs','de','en','es','fr','it','nl','pl','ro','sv','vi','ru','tr','zh-CN'];
+var availLangText = ['Čeština', 'Deutsch', 'English', 'Español', 'Français', 'Italiano', 'Nederlands', 'Polski', 'Română', 'Svenska', 'Tiếng Việt', 'русский', 'Türkçe', '汉语'];
 var availAccess = ['default','advanced','expert'];
 //$.i18n.debug = true;
+
+//Change Password
+function changePassword(){
+	showInfoDialog('changePassword', $.i18n('InfoDialog_changePassword_title'));
+
+	// fill default pw if default is set
+	if(window.defaultPasswordIsSet)
+		$('#oldPw').val('hyperion')
+
+	$('#id_btn_ok').off().on('click',function() {
+		var oldPw = $('#oldPw').val();
+		var newPw = $('#newPw').val();
+
+		requestChangePassword(oldPw, newPw)
+	});
+
+	$('#newPw, #oldPw').off().on('input',function(e) {
+		($('#oldPw').val().length >= 8 && $('#newPw').val().length >= 8) && !window.readOnlyMode ? $('#id_btn_ok').attr('disabled', false) : $('#id_btn_ok').attr('disabled', true);
+	});
+}
 
 $(document).ready( function() {
 
@@ -49,33 +70,7 @@ $(document).ready( function() {
 		$('#btn_setaccess').attr("disabled", true);
 	}
 
-	$('#btn_setlang').off().on('click',function() {
-		var newLang;
-		showInfoDialog('select', $.i18n('InfoDialog_lang_title'), $.i18n('InfoDialog_lang_text'));
-
-		for (var lcx = 0; lcx<availLang.length; lcx++)
-		{
-			$('#id_select').append(createSelOpt(availLang[lcx], $.i18n('general_speech_'+availLang[lcx])))
-		}
-
-		if (storedLang != "auto")
-			$('#id_select').val(storedLang);
-
-		$('#id_select').off().on('change',function() {
-			newLang = $('#id_select').val();
-			if (newLang == storedLang)
-				$('#id_btn_saveset').attr('disabled', true);
-			else
-				$('#id_btn_saveset').attr('disabled', false);
-		});
-
-		$('#id_btn_saveset').off().on('click',function() {
-				setStorage("langcode", newLang);
-				reload();
-		});
-
-		$('#id_select').trigger('change');
-	});
+	initLanguageSelection();
 
 	//access
 	storedAccess = getStorage("accesslevel");
@@ -112,6 +107,17 @@ $(document).ready( function() {
 		$('#id_select').trigger('change');
 	});
 
+	// change pw btn
+	$('#btn_changePassword').off().on('click',function() {
+		changePassword();
+	});
+
+	//Lock Ui
+	$('#btn_lock_ui').off().on('click',function() {
+		removeStorage('loginToken', true);
+		location.replace('/');
+	});
+
 	//hide menu elements
 	if (storedAccess != 'expert')
 		$('#load_webconfig').toggle(false);
@@ -126,20 +132,16 @@ $(document).ready( function() {
 		{
 			if(lsys != window.wSess[i].host+':'+window.wSess[i].port)
 			{
-				var hyperionAddress
-
-				if (window.wSess[i].address.indexOf(':') > -1 && window.wSess[i].address.length == 36)
-					hyperionAddress = 'http://['+window.wSess[i].address+']:'+window.wSess[i].port
-				else
-					hyperionAddress = 'http://'+window.wSess[i].address+':'+window.wSess[i].port
-
-				$('#id_select').append(createSelOpt(hyperionAddress, window.wSess[i].host))
+				var hyperionAddress = window.wSess[i].address;
+				if(hyperionAddress.indexOf(':') > -1 && hyperionAddress.length == 36) hyperionAddress = '['+hyperionAddress+']';
+				hyperionAddress = 'http://'+hyperionAddress+':'+window.wSess[i].port;
+				$('#id_select').append(createSelOpt(hyperionAddress, window.wSess[i].name));
 			}
 		}
 
 		$('#id_btn_saveset').off().on('click',function() {
 			$("#loading_overlay").addClass("overlay");
-			window.location.href = $('#id_select').val()
+			window.location.href = $('#id_select').val();
 		});
 
 	});

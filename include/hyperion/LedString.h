@@ -15,60 +15,61 @@
 namespace Json { class Value; }
 
 /// Enumeration containing the possible orders of device color byte data
-enum ColorOrder
+enum class ColorOrder
 {
 	ORDER_RGB, ORDER_RBG, ORDER_GRB, ORDER_BRG, ORDER_GBR, ORDER_BGR
 };
 
-inline QString colorOrderToString(const ColorOrder colorOrder)
+inline QString colorOrderToString(ColorOrder colorOrder)
 {
 	switch (colorOrder)
 	{
-	case ORDER_RGB:
+	case ColorOrder::ORDER_RGB:
 		return "rgb";
-	case ORDER_RBG:
+	case ColorOrder::ORDER_RBG:
 		return "rbg";
-	case ORDER_GRB:
+	case ColorOrder::ORDER_GRB:
 		return "grb";
-	case ORDER_BRG:
+	case ColorOrder::ORDER_BRG:
 		return "brg";
-	case ORDER_GBR:
+	case ColorOrder::ORDER_GBR:
 		return "gbr";
-	case ORDER_BGR:
+	case ColorOrder::ORDER_BGR:
 		return "bgr";
 	default:
 		return "not-a-colororder";
 	}
 }
+
 inline ColorOrder stringToColorOrder(const QString & order)
 {
 	if (order == "rgb")
 	{
-		return ORDER_RGB;
+		return ColorOrder::ORDER_RGB;
 	}
 	else if (order == "bgr")
 	{
-		return ORDER_BGR;
+		return ColorOrder::ORDER_BGR;
 	}
 	else if (order == "rbg")
 	{
-		return ORDER_RBG;
+		return ColorOrder::ORDER_RBG;
 	}
 	else if (order == "brg")
 	{
-		return ORDER_BRG;
+		return ColorOrder::ORDER_BRG;
 	}
 	else if (order == "gbr")
 	{
-		return ORDER_GBR;
+		return ColorOrder::ORDER_GBR;
 	}
 	else if (order == "grb")
 	{
-		return ORDER_GRB;
+		return ColorOrder::ORDER_GRB;
 	}
 
 	std::cout << "Unknown color order defined (" << order.toStdString() << "). Using RGB." << std::endl;
-	return ORDER_RGB;
+	return ColorOrder::ORDER_RGB;
 }
 
 ///
@@ -88,9 +89,6 @@ inline ColorOrder stringToColorOrder(const QString & order)
 ///
 struct Led
 {
-	///  The index of the led
-	unsigned index;
-
 	///  The minimum vertical scan line included for this leds color
 	double minX_frac;
 	///  The maximum vertical scan line included for this leds color
@@ -99,8 +97,6 @@ struct Led
 	double minY_frac;
 	///  The maximum horizontal scan line included for this leds color
 	double maxY_frac;
-	/// id to clone
-	int clone;
 	/// the color order
 	ColorOrder colorOrder;
 };
@@ -111,16 +107,6 @@ struct Led
 class LedString
 {
 public:
-	///
-	/// Constructs the LedString with no leds
-	///
-	LedString();
-
-	///
-	/// Destructor of this LedString
-	///
-	~LedString();
-
 	///
 	/// Returns the led specifications
 	///

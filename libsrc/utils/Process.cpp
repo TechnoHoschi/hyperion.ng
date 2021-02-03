@@ -1,7 +1,24 @@
+#ifdef _WIN32
+#include <utils/Logger.h>
+#include <QString>
+#include <QByteArray>
+namespace Process {
+
+void restartHyperion(bool asNewProcess) {}
+
+QByteArray command_exec(const QString& /*cmd*/, const QByteArray& /*data*/)
+{
+	return QSTRING_CSTR(QString());
+}
+};
+
+#else
+
 #include <utils/Process.h>
 #include <utils/Logger.h>
 
 #include <QCoreApplication>
+#include <QProcess>
 #include <QStringList>
 
 #include <unistd.h>
@@ -15,32 +32,26 @@ namespace Process {
 void restartHyperion(bool asNewProcess)
 {
 	Logger* log = Logger::getInstance("Process");
+	Info(log, "Restarting hyperion ...");
+
 	std::cout << std::endl
 		<< "      *******************************************" << std::endl
 		<< "      *      hyperion will restart now          *" << std::endl
 		<< "      *******************************************" << std::endl << std::endl;
 
+	auto arguments = QCoreApplication::arguments();
+	if (!arguments.contains("--wait-hyperion"))
+		arguments << "--wait-hyperion";
 
-	QStringList qargs = QCoreApplication::arguments();
-	int size = qargs.size();
-	char *args[size+1];
-	args[size] = nullptr;
-	for(int i=0; i<size; i++)
-	{
-		int str_size = qargs[i].toLocal8Bit().size();
-		args[i] = new char[str_size+1];
-		strncpy(args[i], qargs[i].toLocal8Bit().constData(),str_size );
-		args[i][str_size] = '\0';
-	}
+	QProcess::startDetached(QCoreApplication::applicationFilePath(), arguments);
 
-	execv(args[0],args);
-	Error(log, "error while restarting hyperion");
+	QCoreApplication::quit();
 }
 
-QByteArray command_exec(QString cmd, QByteArray data)
+QByteArray command_exec(const QString& cmd, const QByteArray& data)
 {
 	char buffer[128];
-	QString result = "";
+	QString result;
 
 	std::shared_ptr<FILE> pipe(popen(cmd.toLocal8Bit().constData(), "r"), pclose);
 	if (pipe)
@@ -55,3 +66,5 @@ QByteArray command_exec(QString cmd, QByteArray data)
 }
 
 };
+
+#endif

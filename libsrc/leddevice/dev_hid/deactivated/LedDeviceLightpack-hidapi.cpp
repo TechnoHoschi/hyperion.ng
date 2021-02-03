@@ -53,7 +53,7 @@ LedDeviceLightpackHidapi::~LedDeviceLightpackHidapi()
 		_deviceHandle = nullptr;
 	}
 
-	// TODO: Should be called to avoid memory loss, but only at the end of the application
+	// TODO: Should be called to avoid memory leak, but only at the end of the application
 	//hid_exit();
 }
 
@@ -240,11 +240,6 @@ int LedDeviceLightpackHidapi::switchOff()
 const std::string &LedDeviceLightpackHidapi::getSerialNumber() const
 {
 	return _serialNumber;
-}
-
-int LedDeviceLightpackHidapi::getLedCount() const
-{
-	return _ledCount;
 }
 
 int LedDeviceLightpackHidapi::writeBytes(uint8_t *data, int size)

@@ -7,12 +7,16 @@
 // flatbuffer includes
 #include <flatbufserver/FlatBufferConnection.h>
 
-FlatBufferConnection::FlatBufferConnection(const QString& origin, const QString & address, const int& priority, const bool& skipReply)
+// flatbuffer FBS
+#include "hyperion_reply_generated.h"
+#include "hyperion_request_generated.h"
+
+FlatBufferConnection::FlatBufferConnection(const QString& origin, const QString & address, int priority, bool skipReply)
 	: _socket()
 	, _origin(origin)
 	, _priority(priority)
 	, _prevSocketState(QAbstractSocket::UnconnectedState)
-	, _log(Logger::getInstance("FLATBUFCONNECTION"))
+	, _log(Logger::getInstance("FLATBUFCONN"))
 	, _registered(false)
 {
 	QStringList parts = address.split(":");
@@ -66,7 +70,7 @@ void FlatBufferConnection::readData()
 		if((uint32_t) _receiveBuffer.size() < messageSize + 4) return;
 
 		// extract message only and remove header + msg from buffer :: QByteArray::remove() does not return the removed data
-		const QByteArray msg = _receiveBuffer.right(messageSize);
+		const QByteArray msg = _receiveBuffer.mid(4, messageSize);
 		_receiveBuffer.remove(0, messageSize + 4);
 
 		const uint8_t* msgData = reinterpret_cast<const uint8_t*>(msg.constData());
@@ -81,7 +85,7 @@ void FlatBufferConnection::readData()
 	}
 }
 
-void FlatBufferConnection::setSkipReply(const bool& skip)
+void FlatBufferConnection::setSkipReply(bool skip)
 {
 	if(skip)
 		disconnect(&_socket, &QTcpSocket::readyRead, 0, 0);
@@ -117,6 +121,7 @@ void FlatBufferConnection::setColor(const ColorRgb & color, int priority, int du
 
 	_builder.Finish(req);
 	sendMessage(_builder.GetBufferPointer(), _builder.GetSize());
+	_builder.Clear();
 }
 
 void FlatBufferConnection::setImage(const Image<ColorRgb> &image)
@@ -128,6 +133,7 @@ void FlatBufferConnection::setImage(const Image<ColorRgb> &image)
 
 	_builder.Finish(req);
 	sendMessage(_builder.GetBufferPointer(), _builder.GetSize());
+	_builder.Clear();
 }
 
 void FlatBufferConnection::clear(int priority)
@@ -137,6 +143,7 @@ void FlatBufferConnection::clear(int priority)
 
 	_builder.Finish(req);
 	sendMessage(_builder.GetBufferPointer(), _builder.GetSize());
+	_builder.Clear();
 }
 
 void FlatBufferConnection::clearAll()
@@ -193,7 +200,6 @@ void FlatBufferConnection::sendMessage(const uint8_t* buffer, uint32_t size)
 	count += _socket.write(reinterpret_cast<const char *>(header), 4);
 	count += _socket.write(reinterpret_cast<const char *>(buffer), size);
 	_socket.flush();
-	_builder.Clear();
 }
 
 bool FlatBufferConnection::parseReply(const hyperionnet::Reply *reply)

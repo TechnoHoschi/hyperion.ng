@@ -1,6 +1,7 @@
-#pragma once
+#ifndef LEDEVICEATMO_H
+#define LEDEVICEATMO_H
 
-// hyperion incluse
+// hyperion includes
 #include "ProviderRs232.h"
 
 ///
@@ -9,24 +10,35 @@
 class LedDeviceAtmo : public ProviderRs232
 {
 public:
-	///
-	/// Constructs specific LedDevice
-	///
-	/// @param deviceConfig json device config
-	///
-	LedDeviceAtmo(const QJsonObject &deviceConfig);
 
-	/// constructs leddevice
+	///
+	/// @brief Constructs an Atmo LED-device
+	///
+	/// @param deviceConfig Device's configuration as JSON-Object
+	///
+	explicit LedDeviceAtmo(const QJsonObject &deviceConfig);
+
+	///
+	/// @brief Destructor of the LedDevice
+	///
 	static LedDevice* construct(const QJsonObject &deviceConfig);
 
-	virtual bool init(const QJsonObject &deviceConfig);
-
 private:
+
 	///
-	/// Writes the led color values to the led-device
+	/// @brief Initialise the device's configuration
 	///
-	/// @param ledValues The color-value per led
-	/// @return Zero on succes else negative
+	/// @param[in] deviceConfig the JSON device configuration
+	/// @return True, if success
+	bool init(const QJsonObject &deviceConfig) override;
+
 	///
-	virtual int write(const std::vector<ColorRgb> &ledValues);
+	/// @brief Writes the RGB-Color values to the LEDs.
+	///
+	/// @param[in] ledValues The RGB-color per LED
+	/// @return Zero on success, else negative
+	///
+	int write(const std::vector<ColorRgb> &ledValues) override;
 };
+
+#endif // LEDEVICEATMO_H

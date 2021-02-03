@@ -35,7 +35,7 @@ void ProtoServer::initServer()
 	handleSettingsUpdate(settings::PROTOSERVER, _config);
 }
 
-void ProtoServer::handleSettingsUpdate(const settings::type& type, const QJsonDocument& config)
+void ProtoServer::handleSettingsUpdate(settings::type type, const QJsonDocument& config)
 {
 	if(type == settings::PROTOSERVER)
 	{
@@ -71,7 +71,6 @@ void ProtoServer::newConnection()
 				connect(client, &ProtoClientConnection::clientDisconnected, this, &ProtoServer::clientDisconnected);
 				connect(client, &ProtoClientConnection::registerGlobalInput, GlobalSignals::getInstance(), &GlobalSignals::registerGlobalInput);
 				connect(client, &ProtoClientConnection::clearGlobalInput, GlobalSignals::getInstance(), &GlobalSignals::clearGlobalInput);
-				connect(client, &ProtoClientConnection::clearAllGlobalInput, GlobalSignals::getInstance(), &GlobalSignals::clearAllGlobalInput);
 				connect(client, &ProtoClientConnection::setGlobalInputImage, GlobalSignals::getInstance(), &GlobalSignals::setGlobalImage);
 				connect(client, &ProtoClientConnection::setGlobalInputColor, GlobalSignals::getInstance(), &GlobalSignals::setGlobalColor);
 				connect(GlobalSignals::getInstance(), &GlobalSignals::globalRegRequired, client, &ProtoClientConnection::registationRequired);

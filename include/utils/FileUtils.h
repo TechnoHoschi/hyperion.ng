@@ -10,8 +10,8 @@
 
 namespace FileUtils {
 
-QString getBaseName( QString sourceFile);
-QString getDirName( QString sourceFile);
+	QString getBaseName(const QString& sourceFile);
+	QString getDirName(const QString& sourceFile);
 
 	///
 	/// @brief remove directory recursive given by path
@@ -61,4 +61,4 @@ QString getDirName( QString sourceFile);
 	/// @param[in]  log      The logger of the caller
 	///
 	void resolveFileError(const QFile& file, Logger* log);
-};
+}

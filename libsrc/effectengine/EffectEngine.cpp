@@ -4,10 +4,6 @@
 
 // Qt includes
 #include <QResource>
-#include <QMetaType>
-#include <QFile>
-#include <QDir>
-#include <QMap>
 
 // hyperion util includes
 #include <utils/jsonschema/QJsonSchemaChecker.h>
@@ -28,13 +24,12 @@ EffectEngine::EffectEngine(Hyperion * hyperion)
 	, _log(Logger::getInstance("EFFECTENGINE"))
 	, _effectFileHandler(EffectFileHandler::getInstance())
 {
-
 	Q_INIT_RESOURCE(EffectEngine);
 	qRegisterMetaType<hyperion::Components>("hyperion::Components");
 
 	// connect the Hyperion channel clear feedback
-	connect(_hyperion, SIGNAL(channelCleared(int)), this, SLOT(channelCleared(int)));
-	connect(_hyperion, SIGNAL(allChannelsCleared()), this, SLOT(allChannelsCleared()));
+	connect(_hyperion, &Hyperion::channelCleared, this, &EffectEngine::channelCleared);
+	connect(_hyperion, &Hyperion::allChannelsCleared, this, &EffectEngine::allChannelsCleared);
 
 	// get notifications about refreshed effect list
 	connect(_effectFileHandler, &EffectFileHandler::effectListChanged, this, &EffectEngine::handleUpdatedEffectList);
@@ -45,21 +40,26 @@ EffectEngine::EffectEngine(Hyperion * hyperion)
 
 EffectEngine::~EffectEngine()
 {
+	for (Effect * effect : _activeEffects)
+	{
+		effect->wait();
+		delete effect;
+	}
 }
 
-bool EffectEngine::saveEffect(const QJsonObject& obj, QString& resultMsg)
+QString EffectEngine::saveEffect(const QJsonObject& obj)
 {
-	return _effectFileHandler->saveEffect(obj, resultMsg);
+	return _effectFileHandler->saveEffect(obj);
 }
 
-bool EffectEngine::deleteEffect(const QString& effectName, QString& resultMsg)
+QString EffectEngine::deleteEffect(const QString& effectName)
 {
-	return _effectFileHandler->deleteEffect(effectName, resultMsg);
+	return _effectFileHandler->deleteEffect(effectName);
 }
 
-const std::list<ActiveEffectDefinition> &EffectEngine::getActiveEffects()
+std::list<ActiveEffectDefinition> EffectEngine::getActiveEffects() const
 {
-	_availableActiveEffects.clear();
+	std::list<ActiveEffectDefinition> availableActiveEffects;
 
 	for (Effect * effect : _activeEffects)
 	{
@@ -69,13 +69,13 @@ const std::list<ActiveEffectDefinition> &EffectEngine::getActiveEffects()
 		activeEffectDefinition.priority = effect->getPriority();
 		activeEffectDefinition.timeout  = effect->getTimeout();
 		activeEffectDefinition.args     = effect->getArgs();
-		_availableActiveEffects.push_back(activeEffectDefinition);
+		availableActiveEffects.push_back(activeEffectDefinition);
 	}
 
-	return _availableActiveEffects;
+	return availableActiveEffects;
 }
 
-const std::list<EffectSchema> & EffectEngine::getEffectSchemas()
+std::list<EffectSchema> EffectEngine::getEffectSchemas() const
 {
 	return _effectFileHandler->getEffectSchemas();
 }
@@ -111,19 +111,23 @@ void EffectEngine::handleUpdatedEffectList()
 {
 	_availableEffects.clear();
 
+	unsigned id = 2;
 	for (auto def : _effectFileHandler->getEffects())
 	{
 		// add smoothing configs to Hyperion
 		if (def.args["smoothing-custom-settings"].toBool())
 		{
-			def.smoothCfg = _hyperion->addSmoothingConfig(
+			def.smoothCfg = _hyperion->updateSmoothingConfig(
+				id,
 				def.args["smoothing-time_ms"].toInt(),
 				def.args["smoothing-updateFrequency"].toDouble(),
 				0 );
+			//Debug( _log, "Customs Settings: Update effect %s, script %s, file %s, smoothCfg [%u]", QSTRING_CSTR(def.name), QSTRING_CSTR(def.script), QSTRING_CSTR(def.file), def.smoothCfg);
 		}
 		else
 		{
-			def.smoothCfg = _hyperion->addSmoothingConfig(true);
+			def.smoothCfg = _hyperion->updateSmoothingConfig(id);
+			//Debug( _log, "Default Settings: Update effect %s, script %s, file %s, smoothCfg [%u]", QSTRING_CSTR(def.name), QSTRING_CSTR(def.script), QSTRING_CSTR(def.file), def.smoothCfg);
 		}
 		_availableEffects.push_back(def);
 	}
@@ -137,8 +141,6 @@ int EffectEngine::runEffect(const QString &effectName, int priority, int timeout
 
 int EffectEngine::runEffect(const QString &effectName, const QJsonObject &args, int priority, int timeout, const QString &pythonScript, const QString &origin, unsigned smoothCfg, const QString &imageData)
 {
-	Info( _log, "run effect %s on channel %d", QSTRING_CSTR(effectName), priority);
-
 	if (pythonScript.isEmpty())
 	{
 		const EffectDefinition *effectDefinition = nullptr;
@@ -153,12 +155,14 @@ int EffectEngine::runEffect(const QString &effectName, const QJsonObject &args, 
 		if (effectDefinition == nullptr)
 		{
 			// no such effect
-			Error(_log, "Effect %s not found",  QSTRING_CSTR(effectName));
+			Error(_log, "Effect \"%s\" not found",  QSTRING_CSTR(effectName));
 			return -1;
 		}
 
+		Info( _log, "Run effect \"%s\" on channel %d", QSTRING_CSTR(effectName), priority);
 		return runEffectScript(effectDefinition->script, effectName, (args.isEmpty() ? effectDefinition->args : args), priority, timeout, origin, effectDefinition->smoothCfg);
 	}
+	Info( _log, "Run effect \"%s\" on channel %d", QSTRING_CSTR(effectName), priority);
 	return runEffectScript(pythonScript, effectName, args, priority, timeout, origin, smoothCfg, imageData);
 }
 
@@ -176,6 +180,7 @@ int EffectEngine::runEffectScript(const QString &script, const QString &name, co
 	_activeEffects.push_back(effect);
 
 	// start the effect
+	Debug(_log, "Start the effect: name [%s], smoothCfg [%u]", QSTRING_CSTR(name), smoothCfg);
 	_hyperion->registerInput(priority, hyperion::COMP_EFFECT, origin, name ,smoothCfg);
 	effect->start();
 

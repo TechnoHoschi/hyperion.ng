@@ -73,7 +73,7 @@ void QJsonSchemaChecker::validate(const QJsonValue & value, const QJsonObject &s
 		QJsonObject::const_iterator defaultValue = schema.find("default");
 
 		if (attribute == "type")
-			checkType(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkType(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "properties")
 		{
 			if (value.isObject())
@@ -82,6 +82,17 @@ void QJsonSchemaChecker::validate(const QJsonValue & value, const QJsonObject &s
 			{
 				_schemaError = true;
 				setMessage("properties attribute is only valid for objects");
+				continue;
+			}
+		}
+		else if (attribute == "dependencies")
+		{
+			if (value.isObject())
+				checkDependencies(value.toObject(), attributeValue.toObject());
+			else
+			{
+				_schemaError = true;
+				setMessage("dependencies attribute is only valid for objects");
 				continue;
 			}
 		}
@@ -106,13 +117,13 @@ void QJsonSchemaChecker::validate(const QJsonValue & value, const QJsonObject &s
 			}
 		}
 		else if (attribute == "minimum")
-			checkMinimum(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkMinimum(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "maximum")
-			checkMaximum(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkMaximum(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "minLength")
-			checkMinLength(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkMinLength(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "maxLength")
-			checkMaxLength(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkMaxLength(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "items")
 		{
 			if (value.isArray())
@@ -125,19 +136,20 @@ void QJsonSchemaChecker::validate(const QJsonValue & value, const QJsonObject &s
 			}
 		}
 		else if (attribute == "minItems")
-			checkMinItems(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkMinItems(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "maxItems")
-			checkMaxItems(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkMaxItems(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
 		else if (attribute == "uniqueItems")
 			checkUniqueItems(value, attributeValue);
 		else if (attribute == "enum")
-			checkEnum(value, attributeValue, (defaultValue != schema.end() ? defaultValue.value() : QJsonValue::Null));
+			checkEnum(value, attributeValue, (defaultValue != schema.end() ? *defaultValue : QJsonValue::Null));
  		else if (attribute == "required")
  			; // nothing to do. value is present so always oke
  		else if (attribute == "id")
  			; // references have already been collected
  		else if (attribute == "title" || attribute == "description"  || attribute == "default" || attribute == "format"
-			|| attribute == "defaultProperties" || attribute == "propertyOrder" || attribute == "append" || attribute == "step" || attribute == "access" || attribute == "options" || attribute == "script")
+			|| attribute == "defaultProperties" || attribute == "propertyOrder" || attribute == "append" || attribute == "step"
+			|| attribute == "access" || attribute == "options" || attribute == "script" || attribute == "allowEmptyArray" || attribute == "comment")
  			; // nothing to do.
 		else
 		{
@@ -154,7 +166,7 @@ void QJsonSchemaChecker::setMessage(const QString & message)
 	_messages.append(_currentPath.join("") +": "+message);
 }
 
-const QStringList & QJsonSchemaChecker::getMessages() const
+QStringList QJsonSchemaChecker::getMessages() const
 {
 	return _messages;
 }
@@ -225,7 +237,7 @@ void QJsonSchemaChecker::checkProperties(const QJsonObject & value, const QJsonO
 			if (_correct == "create")
 			{
 				QJsonUtils::modify(_autoCorrected, _currentPath,  QJsonUtils::create(propertyValue, _ignoreRequired), property);
-				setMessage("Create property: "+property+" with value: "+propertyValue.toObject().find("default").value().toString());
+				setMessage("Create property: "+property+" with value: "+QJsonUtils::getDefaultValue(propertyValue));
 			}
 
 			if (_correct == "")
@@ -235,6 +247,62 @@ void QJsonSchemaChecker::checkProperties(const QJsonObject & value, const QJsonO
 			QJsonUtils::modify(_autoCorrected, _currentPath,  QJsonUtils::create(propertyValue, _ignoreRequired), property);
 
 		_currentPath.removeLast();
+	}
+}
+
+void QJsonSchemaChecker::checkDependencies(const QJsonObject & value, const QJsonObject & schema)
+{
+	for (QJsonObject::const_iterator i = schema.begin(); i != schema.end(); ++i)
+	{
+		QString property = i.key();
+		const QJsonValue & propertyValue = *i;
+
+		if (propertyValue.toObject().contains("properties"))
+		{
+			_currentPath.append("." + property);
+
+			const QJsonObject & dependencies = propertyValue.toObject()["properties"].toObject();
+
+			bool valid = false;
+			for (QJsonObject::const_iterator d = dependencies.begin(); d != dependencies.end(); ++d)
+			{
+				QString dependency = d.key();
+				const QJsonValue & dependencyValue = *d;
+
+				if (dependencyValue.toObject()["enum"].isArray())
+				{
+					QJsonArray jArray = dependencyValue.toObject()["enum"].toArray();
+					for(int a = 0; a < jArray.size(); ++a)
+					{
+						if (value[dependency] == jArray[a])
+						{
+							valid = true;
+							break;
+						}
+						else
+							valid = false;
+					}
+				}
+				else
+					valid = (value[dependency] == dependencyValue.toObject()["enum"]);
+			}
+
+			if (value.contains(property) && !valid)
+			{
+				_error = true;
+
+				if (_correct == "remove")
+				{
+					QJsonUtils::modify(_autoCorrected, _currentPath);
+					setMessage("Removed property: "+property);
+				}
+
+				if (_correct == "")
+					setMessage("Property not required");
+			}
+
+			_currentPath.removeLast();
+		}
 	}
 }
 
@@ -391,7 +459,7 @@ void QJsonSchemaChecker::checkItems(const QJsonValue & value, const QJsonObject 
 	QJsonArray jArray = value.toArray();
 
 	if (_correct == "remove")
-		if (jArray.isEmpty())
+		if (jArray.isEmpty() && !schema.contains("allowEmptyArray"))
 		{
 			QJsonUtils::modify(_autoCorrected, _currentPath);
 			setMessage("Remove empty array");

@@ -1,6 +1,7 @@
-#pragma once
+#ifndef LEDEVICEAPA104_H
+#define LEDEVICEAPA104_H
 
-// hyperion incluse
+// hyperion includes
 #include "ProviderSpi.h"
 
 ///
@@ -9,35 +10,43 @@
 class LedDeviceAPA104 : public ProviderSpi
 {
 public:
-	///
-	/// Constructs specific LedDevice
-	///
-	/// @param deviceConfig json device config
-	///
-	LedDeviceAPA104(const QJsonObject &deviceConfig);
 
-	/// constructs leddevice
+	///
+	/// @brief Constructs an APA104 LED-device
+	///
+	/// @param deviceConfig Device's configuration as JSON-Object
+	///
+	explicit LedDeviceAPA104(const QJsonObject &deviceConfig);
+
+	///
+	/// @brief Constructs the LED-device
+	///
+	/// @param[in] deviceConfig Device's configuration as JSON-Object
+	/// @return LedDevice constructed
 	static LedDevice* construct(const QJsonObject &deviceConfig);
 
-	///
-	/// Sets configuration
-	///
-	/// @param deviceConfig the json device config
-	/// @return true if success
-	virtual bool init(const QJsonObject &deviceConfig);
-
 private:
-	///
-	/// Writes the led color values to the led-device
-	///
-	/// @param ledValues The color-value per led
-	/// @return Zero on succes else negative
-	///
-	virtual int write(const std::vector<ColorRgb> &ledValues);
 
-        const int SPI_BYTES_PER_COLOUR;
+	///
+	/// @brief Initialise the device's configuration
+	///
+	/// @param[in] deviceConfig the JSON device configuration
+	/// @return True, if success
+	///
+	bool init(const QJsonObject &deviceConfig) override;
 
+	///
+	/// @brief Writes the RGB-Color values to the LEDs.
+	///
+	/// @param[in] ledValues The RGB-color per LED
+	/// @return Zero on success, else negative
+	///
+	int write(const std::vector<ColorRgb> & ledValues) override;
+
+	const int SPI_BYTES_PER_COLOUR;
 	const int SPI_FRAME_END_LATCH_BYTES;
 
 	uint8_t bitpair_to_byte[4];
 };
+
+#endif // LEDEVICEAPA104_H

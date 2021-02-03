@@ -2,7 +2,7 @@
 #include <utils/Logger.h>
 #include <hyperion/MultiColorAdjustment.h>
 
-MultiColorAdjustment::MultiColorAdjustment(const unsigned ledCnt)
+MultiColorAdjustment::MultiColorAdjustment(int ledCnt)
 	: _ledAdjustments(ledCnt, nullptr)
 	, _log(Logger::getInstance("ADJUSTMENT"))
 {
@@ -14,6 +14,8 @@ MultiColorAdjustment::~MultiColorAdjustment()
 	for (ColorAdjustment * adjustment : _adjustment)
 	{
 		delete adjustment;
+		// BUG: Calling pop_back while iterating is invalid
+		_adjustment.pop_back();
 	}
 }
 
@@ -23,25 +25,28 @@ void MultiColorAdjustment::addAdjustment(ColorAdjustment * adjustment)
 	_adjustment.push_back(adjustment);
 }
 
-void MultiColorAdjustment::setAdjustmentForLed(const QString& id, const unsigned startLed, unsigned endLed)
+void MultiColorAdjustment::setAdjustmentForLed(const QString& id, int startLed, int endLed)
 {
 	// abort
-	if(startLed >= endLed)
+	if(startLed > endLed)
 	{
-		Error(_log,"startLed >= endLed -> %d >= %d", startLed, endLed);
+		Error(_log,"startLed > endLed -> %d > %d", startLed, endLed);
 		return;
 	}
 	// catch wrong values
-	if(endLed > _ledAdjustments.size())
+	if(endLed > static_cast<int>(_ledAdjustments.size()-1))
 	{
-		Warning(_log,"The color calibration 'LED index' field has leds specified which aren't part of your led layout");
-		endLed = _ledAdjustments.size();
+		Warning(_log,"The color calibration 'LED index' field has LEDs specified which aren't part of your led layout");
+		endLed = static_cast<int>(_ledAdjustments.size()-1);
 	}
 
 	// Get the identified adjustment (don't care if is nullptr)
 	ColorAdjustment * adjustment = getAdjustment(id);
-	for (unsigned iLed=startLed; iLed<=endLed; ++iLed)
+
+	//Debug(_log,"ColorAdjustment Profile [%s], startLed[%d], endLed[%d]", QSTRING_CSTR(id), startLed, endLed);
+	for (int iLed=startLed; iLed<=endLed; ++iLed)
 	{
+		//Debug(_log,"_ledAdjustments [%d] -> [%p]", iLed, adjustment);
 		_ledAdjustments[iLed] = adjustment;
 	}
 }
@@ -62,7 +67,7 @@ bool MultiColorAdjustment::verifyAdjustments() const
 	return ok;
 }
 
-const QStringList & MultiColorAdjustment::getAdjustmentIds()
+QStringList MultiColorAdjustment::getAdjustmentIds() const
 {
 	return _adjustmentIds;
 }
@@ -98,6 +103,7 @@ void MultiColorAdjustment::applyAdjustment(std::vector<ColorRgb>& ledColors)
 		ColorAdjustment* adjustment = _ledAdjustments[i];
 		if (adjustment == nullptr)
 		{
+			//std::cout << "MultiColorAdjustment::applyAdjustment() - No transform set for this led : " << i << std::endl;
 			// No transform set for this led (do nothing)
 			continue;
 		}

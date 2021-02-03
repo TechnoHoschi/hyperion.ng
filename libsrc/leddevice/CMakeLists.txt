@@ -27,7 +27,7 @@ FILE ( GLOB Leddevice_SOURCES
 	"${CURRENT_SOURCE_DIR}/dev_other/*.cpp"
 )
 
-if ( ENABLE_OSX )
+if ( ENABLE_OSX OR WIN32 )
 	list(REMOVE_ITEM Leddevice_SOURCES "${CURRENT_SOURCE_DIR}/dev_other/LedDevicePiBlaster.h")
 	list(REMOVE_ITEM Leddevice_SOURCES "${CURRENT_SOURCE_DIR}/dev_other/LedDevicePiBlaster.cpp")
 endif()
@@ -87,8 +87,12 @@ target_link_libraries(leddevice
 	${CMAKE_THREAD_LIBS_INIT}
 	Qt5::Network
 	Qt5::SerialPort
-        ssdp
+	ssdp
 )
+
+if(WIN32)
+	target_link_libraries(leddevice ws2_32)
+endif()
 
 if(ENABLE_TINKERFORGE)
 	target_link_libraries(leddevice tinkerforge)
@@ -105,3 +109,11 @@ if (ENABLE_USB_HID)
 		target_link_libraries(leddevice ${LIBUSB_1_LIBRARIES} hidapi-libusb)
 	endif()
 endif()
+
+if (NOT DEFAULT_USE_SYSTEM_MBEDTLS_LIBS)
+	if (MBEDTLS_LIBRARIES)
+		include_directories(${MBEDTLS_INCLUDE_DIR})
+		target_link_libraries(leddevice ${MBEDTLS_LIBRARIES})
+		target_include_directories(leddevice PRIVATE ${MBEDTLS_INCLUDE_DIR})
+	endif (MBEDTLS_LIBRARIES)
+endif ()

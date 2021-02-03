@@ -15,33 +15,31 @@ private:
 
 public:
 	static EffectFileHandler* efhInstance;
-	static EffectFileHandler* getInstance() { return efhInstance; };
+	static EffectFileHandler* getInstance() { return efhInstance; }
 
 	///
 	/// @brief Get all available effects
 	///
-	const std::list<EffectDefinition> & getEffects() const { return _availableEffects; };
+	std::list<EffectDefinition> getEffects() const { return _availableEffects; }
 
 	///
 	/// @brief Get all available schemas
 	///
-	const std::list<EffectSchema> & getEffectSchemas() { return _effectSchemas; };
+	std::list<EffectSchema> getEffectSchemas() const { return _effectSchemas; }
 
 	///
 	/// @brief Save an effect
-	/// @param       obj       The effect args
-	/// @param[out] resultMsg  The feedback message
-	/// @return True on success else false
+	/// @param  obj   The effect args
+	/// @return If not empty, it contains the error
 	///
-	bool saveEffect(const QJsonObject& obj, QString& resultMsg);
+	QString saveEffect(const QJsonObject& obj);
 
 	///
 	/// @brief Delete an effect by name.
-	/// @param[in]  effectName  The effect name to delete
-	/// @param[out] resultMsg   The message on error
-	/// @return True on success else false
+	/// @param effectName  The effect name to delete
+	/// @return If not empty, it contains the error
 	///
-	bool deleteEffect(const QString& effectName, QString& resultMsg);
+	QString deleteEffect(const QString& effectName);
 
 public slots:
 	///
@@ -49,7 +47,7 @@ public slots:
 	/// @param type   settingyType from enum
 	/// @param config configuration object
 	///
-	void handleSettingsUpdate(const settings::type& type, const QJsonDocument& config);
+	void handleSettingsUpdate(settings::type type, const QJsonDocument& config);
 
 signals:
 	///

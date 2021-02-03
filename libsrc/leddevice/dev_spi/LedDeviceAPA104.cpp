@@ -35,7 +35,7 @@ Reset time is 24uS = 59 bits = 8 bytes
 */
 
 LedDeviceAPA104::LedDeviceAPA104(const QJsonObject &deviceConfig)
-	: ProviderSpi()
+	: ProviderSpi(deviceConfig)
 	, SPI_BYTES_PER_COLOUR(4)
 	, SPI_FRAME_END_LATCH_BYTES(8)
 	, bitpair_to_byte {
@@ -45,8 +45,8 @@ LedDeviceAPA104::LedDeviceAPA104(const QJsonObject &deviceConfig)
 		0b11101110,
 	}
 {
-	_deviceReady = init(deviceConfig);
 }
+
 
 LedDevice* LedDeviceAPA104::construct(const QJsonObject &deviceConfig)
 {
@@ -56,15 +56,19 @@ LedDevice* LedDeviceAPA104::construct(const QJsonObject &deviceConfig)
 bool LedDeviceAPA104::init(const QJsonObject &deviceConfig)
 {
 	_baudRate_Hz = 2235000;
-	if ( !ProviderSpi::init(deviceConfig) )
+
+	bool isInitOK = false;
+
+	// Initialise sub-class
+	if ( ProviderSpi::init(deviceConfig) )
 	{
-		return false;
+		WarningIf(( _baudRate_Hz < 2000000 || _baudRate_Hz > 2470000 ), _log, "SPI rate %d outside recommended range (2000000 -> 2470000)", _baudRate_Hz);
+
+		_ledBuffer.resize(_ledRGBCount * SPI_BYTES_PER_COLOUR + SPI_FRAME_END_LATCH_BYTES, 0x00);
+
+		isInitOK = true;
 	}
-	WarningIf(( _baudRate_Hz < 2000000 || _baudRate_Hz > 2470000 ), _log, "SPI rate %d outside recommended range (2000000 -> 2470000)", _baudRate_Hz);
-
-	_ledBuffer.resize(_ledRGBCount * SPI_BYTES_PER_COLOUR + SPI_FRAME_END_LATCH_BYTES, 0x00);
-
-	return true;
+	return isInitOK;
 }
 
 int LedDeviceAPA104::write(const std::vector<ColorRgb> &ledValues)

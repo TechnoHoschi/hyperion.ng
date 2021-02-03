@@ -34,10 +34,10 @@ class MessageForwarder : public QObject
 	Q_OBJECT
 public:
 	MessageForwarder(Hyperion* hyperion);
-	~MessageForwarder();
+	~MessageForwarder() override;
 
-	void addJsonSlave(QString slave);
-	void addProtoSlave(QString slave);
+	void addJsonSlave(const QString& slave);
+	void addFlatbufferSlave(const QString& slave);
 
 private slots:
 	///
@@ -45,20 +45,20 @@ private slots:
 	/// @param type   settingyType from enum
 	/// @param config configuration object
 	///
-	void handleSettingsUpdate(const settings::type &type, const QJsonDocument &config);
+	void handleSettingsUpdate(settings::type type, const QJsonDocument &config);
 
 	///
 	/// @brief Handle component state change MessageForwarder
 	/// @param component  The component from enum
 	/// @param enable     The new state
 	///
-	void componentStateChanged(const hyperion::Components component, bool enable);
+	void handleCompStateChangeRequest(hyperion::Components component, bool enable);
 
 	///
 	/// @brief Handle priority updates from Priority Muxer
 	/// @param  priority  The new visible priority
 	///
-	void handlePriorityChanges(const quint8 &priority);
+	void handlePriorityChanges(quint8 priority);
 
 	///
 	/// @brief Forward message to all json slaves
@@ -67,10 +67,10 @@ private slots:
 	void forwardJsonMessage(const QJsonObject &message);
 
 	///
-	/// @brief Forward image to all proto slaves
-	/// @param image The PROTO image to send
+	/// @brief Forward image to all flatbuffer slaves
+	/// @param image The flatbuffer image to send
 	///
-	void forwardProtoMessage(const QString& name, const Image<ColorRgb> &image);
+	void forwardFlatbufferMessage(const QString& name, const Image<ColorRgb> &image);
 
 	///
 	/// @brief Forward message to a single json slave
@@ -93,7 +93,7 @@ private:
 	QStringList   _jsonSlaves;
 
 	/// Proto connection for forwarding
-	QStringList _protoSlaves;
+	QStringList _flatSlaves;
 	QList<FlatBufferConnection*> _forwardClients;
 
 	/// Flag if forwarder is enabled

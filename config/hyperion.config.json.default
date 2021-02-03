@@ -15,10 +15,9 @@
 		"type"       : "file",
 		"hardwareLedCount" : 1,
 		"output"     : "/dev/null",
-		"rate"       : 1000000,
 		"colorOrder" : "rgb",
-		"latchTime" : 1,
-		"rewriteTime": 5000
+		"latchTime" : 0,
+		"rewriteTime": 0
 	},
 
 	"color" :
@@ -49,45 +48,54 @@
 
 	"smoothing" :
 	{
-		"enable"           : true,
-		"type"             : "linear",
-		"time_ms"          : 200,
-		"updateFrequency"  : 25.0000,
-		"updateDelay"      : 0,
-		"continuousOutput" : true
+		"enable"            : true,
+		"type"              : "linear",
+		"time_ms"           : 200,
+		"updateFrequency"   : 25.0000,
+		"interpolationRate" : 25.0000,
+		"outputRate"        : 25.0000,
+		"decay"             : 1,
+		"dithering"         : false,
+		"updateDelay"       : 0,
+		"continuousOutput"  : true
 	},
 
 	"grabberV4L2" :
 	{
-		"device"   : "auto",
-		"standard" : "NO_CHANGE",
-		"sizeDecimation"  : 8,
-		"cropLeft"    : 0,
-		"cropRight"   : 0,
-		"cropTop"     : 0,
-		"cropBottom"  : 0,
-		"redSignalThreshold"   : 5,
-		"greenSignalThreshold" : 5,
-		"blueSignalThreshold"  : 5,
-		"signalDetection"      : false,
-		"sDVOffsetMin"   : 0.25,
-		"sDHOffsetMin" : 0.25,
-		"sDVOffsetMax"   : 0.75,
-		"sDHOffsetMax" : 0.75
+		"device"                : "auto",
+		"input"                 : 0,
+		"width"                 : 0,
+		"height"                : 0,
+		"fps"                   : 15,
+		"standard"              : "NO_CHANGE",
+		"sizeDecimation"        : 8,
+		"cropLeft"              : 0,
+		"cropRight"             : 0,
+		"cropTop"               : 0,
+		"cropBottom"            : 0,
+		"redSignalThreshold"    : 5,
+		"greenSignalThreshold"  : 5,
+		"blueSignalThreshold"   : 5,
+		"signalDetection"       : false,
+		"cecDetection"          : false,
+		"sDVOffsetMin"          : 0.25,
+		"sDHOffsetMin"          : 0.25,
+		"sDVOffsetMax"          : 0.75,
+		"sDHOffsetMax"          : 0.75
 	},
 
 	"framegrabber" :
 	{
-		"type"						: "auto",
-		"width"						: 80,
-		"height"					: 45,
-		"frequency_Hz"				: 10,
-		"pixelDecimation"       	: 8,
-		"cropLeft"					: 0,
-		"cropRight"					: 0,
-		"cropTop"					: 0,
-		"cropBottom"				: 0,
-		"device"					: "/dev/fb0"
+		"type"               : "auto",
+		"width"              : 80,
+		"height"             : 45,
+		"frequency_Hz"       : 10,
+		"pixelDecimation"    : 8,
+		"cropLeft"           : 0,
+		"cropRight"          : 0,
+		"cropTop"            : 0,
+		"cropBottom"         : 0,
+		"display"            : 0
 	},
 
 	"blackborderdetector" :
@@ -112,7 +120,7 @@
 
 	"backgroundEffect" :
 	{
-		"enable"      : true,
+		"enable"      : false,
 		"type"        : "effect",
 		"color"       : [255,138,0],
 		"effect"      : "Warm mood blobs"
@@ -122,7 +130,7 @@
 	{
 		"enable" : false,
 		"json"   : ["127.0.0.1:19446"],
-		"proto"  : ["127.0.0.1:19401"]
+		"flat"  : ["127.0.0.1:19401"]
 	},
 
 	"jsonServer" :
@@ -154,7 +162,11 @@
 	"webConfig" :
 	{
 		"document_root" : "",
-		"port"          : 8090
+		"port"          : 8090,
+		"sslPort"		: 8092,
+		"crtPath"		: "",
+		"keyPath"		: "",
+		"keyPassPhrase"	: ""
 	},
 
 	"effects" :
@@ -174,314 +186,55 @@
 	"network" :
 	{
 		"internetAccessAPI" : false,
+		"restirctedInternetAccessAPI" : false,
 		"ipWhitelist" : [],
 		"apiAuth" : true,
-		"localApiAuth" : false
+		"localApiAuth" : false,
+		"localAdminAuth": true
 	},
 
 	"ledConfig" :
 	{
-		"top"	 	: 8,
-		"bottom"	: 8,
-		"left"		: 5,
-		"right"		: 5,
-		"glength"	: 0,
-		"gpos"		: 0,
-		"position"	: 0,
-		"reverse"	: false,
-		"hdepth"	: 8,
-		"vdepth"	: 5,
-		"overlap"	: 0,
-		"edgegap"	: 0
+  	"classic":
+		{
+			"top"	 	: 1,
+			"bottom"	: 0,
+			"left"		: 0,
+			"right"		: 0,
+			"glength"	: 0,
+			"gpos"		: 0,
+			"position"	: 0,
+			"reverse"	: false,
+			"hdepth"	: 8,
+			"vdepth"	: 5,
+			"overlap"	: 0,
+			"edgegap"	: 0,
+			"ptlh"		: 0,
+			"ptlv"		: 0,
+			"ptrh"		: 100,
+			"ptrv"		: 0,
+			"pblh"		: 0,
+			"pblv"		: 100,
+			"pbrh"		: 100,
+			"pbrv"		: 100
+ 		},
+
+		"matrix":
+		{
+			"ledshoriz": 1,
+			"ledsvert" : 1,
+			"cabling"  : "snake",
+			"start"    : "top-left"
+    		}
 	},
 
-    "leds":
+	"leds":
 	[
 		{
-			"hscan": {
-				"maximum": 0.125,
-				"minimum": 0
-			},
-			"index": 0,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.25,
-				"minimum": 0.125
-			},
-			"index": 1,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.375,
-				"minimum": 0.25
-			},
-			"index": 2,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.5,
-				"minimum": 0.375
-			},
-			"index": 3,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.625,
-				"minimum": 0.5
-			},
-			"index": 4,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.75,
-				"minimum": 0.625
-			},
-			"index": 5,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.875,
-				"minimum": 0.75
-			},
-			"index": 6,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.875
-			},
-			"index": 7,
-			"vscan": {
-				"maximum": 0.08,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.95
-			},
-			"index": 8,
-			"vscan": {
-				"maximum": 0.2,
-				"minimum": 0
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.95
-			},
-			"index": 9,
-			"vscan": {
-				"maximum": 0.4,
-				"minimum": 0.2
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.95
-			},
-			"index": 10,
-			"vscan": {
-				"maximum": 0.6,
-				"minimum": 0.4
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.95
-			},
-			"index": 11,
-			"vscan": {
-				"maximum": 0.8,
-				"minimum": 0.6
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.95
-			},
-			"index": 12,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.8
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 1,
-				"minimum": 0.875
-			},
-			"index": 13,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.875,
-				"minimum": 0.75
-			},
-			"index": 14,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.75,
-				"minimum": 0.625
-			},
-			"index": 15,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.625,
-				"minimum": 0.5
-			},
-			"index": 16,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.5,
-				"minimum": 0.375
-			},
-			"index": 17,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.375,
-				"minimum": 0.25
-			},
-			"index": 18,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.25,
-				"minimum": 0.125
-			},
-			"index": 19,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.125,
-				"minimum": 0
-			},
-			"index": 20,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.92
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.05,
-				"minimum": 0
-			},
-			"index": 21,
-			"vscan": {
-				"maximum": 1,
-				"minimum": 0.8
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.05,
-				"minimum": 0
-			},
-			"index": 22,
-			"vscan": {
-				"maximum": 0.8,
-				"minimum": 0.6
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.05,
-				"minimum": 0
-			},
-			"index": 23,
-			"vscan": {
-				"maximum": 0.6,
-				"minimum": 0.4
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.05,
-				"minimum": 0
-			},
-			"index": 24,
-			"vscan": {
-				"maximum": 0.4,
-				"minimum": 0.2
-			}
-		},
-		{
-			"hscan": {
-				"maximum": 0.05,
-				"minimum": 0
-			},
-			"index": 25,
-			"vscan": {
-				"maximum": 0.2,
-				"minimum": 0
-			}
+			"hmax": 1,
+			"hmin": 0,
+			"vmax": 0.08,
+			"vmin": 0
 		}
 	]
 }

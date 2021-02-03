@@ -6,55 +6,29 @@
 // Local LedDevice includes
 #include "LedDeviceTinkerforge.h"
 
-static const unsigned MAX_NUM_LEDS = 320;
-static const unsigned MAX_NUM_LEDS_SETTABLE = 16;
+// Constants
+namespace {
+
+const unsigned MAX_NUM_LEDS = 320;
+const unsigned MAX_NUM_LEDS_SETTABLE = 16;
+const uint16_t DEFAULT_PORT = 4223;
+
+} //End of constants
 
 LedDeviceTinkerforge::LedDeviceTinkerforge(const QJsonObject &deviceConfig)
-	: LedDevice()
-	, _ipConnection(nullptr)
-	, _ledStrip(nullptr)
-	, _colorChannelSize(0)
+	: LedDevice(deviceConfig)
+	  ,_port(DEFAULT_PORT)
+	  ,_ipConnection(nullptr)
+	  ,_ledStrip(nullptr)
+	  ,_colorChannelSize(0)
 {
-	init(deviceConfig);
 }
 
 LedDeviceTinkerforge::~LedDeviceTinkerforge()
 {
-	// Close the device (if it is opened)
-	if (_ipConnection != nullptr && _ledStrip != nullptr)
-	{
-		switchOff();
-	}
-
 	// Clean up claimed resources
 	delete _ipConnection;
 	delete _ledStrip;
-}
-
-bool LedDeviceTinkerforge::init(const QJsonObject &deviceConfig)
-{
-	LedDevice::init(deviceConfig);
-
-	_host     = deviceConfig["output"].toString("127.0.0.1");
-	_port     = deviceConfig["port"].toInt(4223);
-	_uid      = deviceConfig["uid"].toString();
-	_interval = deviceConfig["rate"].toInt();
-
-	if ((unsigned)_ledCount > MAX_NUM_LEDS)
-	{
-		Error(_log,"Invalid attempt to write led values. Not more than %d leds are allowed.", MAX_NUM_LEDS);
-		return -1;
-	}
-
-	if (_colorChannelSize < (unsigned)_ledCount)
-	{
-		_redChannel.resize(_ledCount, uint8_t(0));
-		_greenChannel.resize(_ledCount, uint8_t(0));
-		_blueChannel.resize(_ledCount, uint8_t(0));
-	}
-	_colorChannelSize = _ledCount;
-
-	return true;
 }
 
 LedDevice* LedDeviceTinkerforge::construct(const QJsonObject &deviceConfig)
@@ -62,45 +36,89 @@ LedDevice* LedDeviceTinkerforge::construct(const QJsonObject &deviceConfig)
 	return new LedDeviceTinkerforge(deviceConfig);
 }
 
+bool LedDeviceTinkerforge::init(const QJsonObject &deviceConfig)
+{
+	bool isInitOK = false;
+
+	// Initialise sub-class
+	if ( LedDevice::init(deviceConfig) )
+	{
+		_host     = deviceConfig["output"].toString("127.0.0.1");
+		_port     = deviceConfig["port"].toInt(DEFAULT_PORT);
+		_uid      = deviceConfig["uid"].toString();
+		_interval = deviceConfig["rate"].toInt();
+
+		if ((unsigned)_ledCount > MAX_NUM_LEDS)
+		{
+			QString errortext = QString ("Initialization error. Not more than %1 LEDs are allowed.").arg(MAX_NUM_LEDS);
+			this->setInError(errortext);
+			isInitOK = false;
+	}
+		else
+		{
+			if (_colorChannelSize < (unsigned)_ledCount)
+			{
+				_redChannel.resize(_ledCount, uint8_t(0));
+				_greenChannel.resize(_ledCount, uint8_t(0));
+				_blueChannel.resize(_ledCount, uint8_t(0));
+			}
+			_colorChannelSize = _ledCount;
+			isInitOK = true;
+		}
+	}
+	return isInitOK;
+}
+
 int LedDeviceTinkerforge::open()
 {
-	// Check if connection is already createds
+	int retval = -1;
+	_isDeviceReady = false;
+
+	// Check if connection is already created
 	if (_ipConnection != nullptr)
 	{
 		Error(_log, "Attempt to open existing connection; close before opening");
-		return 0;
 	}
-
-	// Initialise a new connection
-	_ipConnection = new IPConnection;
-	ipcon_create(_ipConnection);
-
-	int connectionStatus = ipcon_connect(_ipConnection, QSTRING_CSTR(_host), _port);
-	if (connectionStatus < 0)
+	else
 	{
-		Error(_log, "Attempt to connect to master brick (%s:%d) failed with status %d", QSTRING_CSTR(_host), _port, connectionStatus);
-		return 0;
+		// Initialise a new connection
+		_ipConnection = new IPConnection;
+		ipcon_create(_ipConnection);
+
+		int connectionStatus = ipcon_connect(_ipConnection, QSTRING_CSTR(_host), _port);
+		if (connectionStatus < 0)
+		{
+			Error(_log, "Attempt to connect to master brick (%s:%d) failed with status %d", QSTRING_CSTR(_host), _port, connectionStatus);
+		}
+		else
+		{
+			// Create the 'LedStrip'
+			_ledStrip = new LEDStrip;
+			led_strip_create(_ledStrip, QSTRING_CSTR(_uid), _ipConnection);
+
+			int frameStatus = led_strip_set_frame_duration(_ledStrip, _interval);
+			if (frameStatus < 0)
+			{
+				Error(_log,"Attempt to connect to led strip bricklet (led_strip_set_frame_duration()) failed with status %d", frameStatus);
+			}
+			else
+			{
+				// Everything is OK, device is ready
+				_isDeviceReady = true;
+				retval = 0;
+			}
+		}
 	}
-
-	// Create the 'LedStrip'
-	_ledStrip = new LEDStrip;
-	led_strip_create(_ledStrip, QSTRING_CSTR(_uid), _ipConnection);
-
-	int frameStatus = led_strip_set_frame_duration(_ledStrip, _interval);
-	if (frameStatus < 0)
+	// On error/exceptions, set LedDevice in error
+	if ( retval < 0 )
 	{
-		Error(_log,"Attempt to connect to led strip bricklet (led_strip_set_frame_duration()) failed with status %d", frameStatus);
-		return 0;
+		this->setInError( "Error opening device!" );
 	}
-
-	return 1;
+	return retval;
 }
 
 int LedDeviceTinkerforge::write(const std::vector<ColorRgb> &ledValues)
 {
-	if(!_deviceReady)
-		return 0;
-
 	auto redIt   = _redChannel.begin();
 	auto greenIt = _greenChannel.begin();
 	auto blueIt  = _blueChannel.begin();

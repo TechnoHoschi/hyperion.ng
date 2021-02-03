@@ -14,8 +14,8 @@ if ! [ -d "$builddir" ]; then
 	echo "Could not find build director"
 	exit 1
 fi
-	
-outfile="$repodir/deploy/hyperion.ng_$buildid.tar.gz"
+
+outfile="$repodir/deploy/hyperion_$buildid.tar.gz"
 echo create $outfile
 
 tar --create --gzip --absolute-names --show-transformed-names --ignore-failed-read\

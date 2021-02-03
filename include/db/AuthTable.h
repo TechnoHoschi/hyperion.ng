@@ -16,15 +16,20 @@ class AuthTable : public DBManager
 
 public:
 	/// construct wrapper with auth table
-	AuthTable(QObject* parent = nullptr)
+	AuthTable(const QString& rootPath = "", QObject* parent = nullptr, bool readonlyMode = false)
 		: DBManager(parent)
 	{
+		setReadonlyMode(readonlyMode);
+		if(!rootPath.isEmpty()){
+			// Init Hyperion database usage
+			setRootPath(rootPath);
+			setDatabaseName("hyperion");
+		}
 		// init Auth table
 		setTable("auth");
 		// create table columns
 		createTable(QStringList()<<"user TEXT"<<"password BLOB"<<"token BLOB"<<"salt BLOB"<<"comment TEXT"<<"id TEXT"<<"created_at TEXT"<<"last_use TEXT");
 	};
-	~AuthTable(){};
 
 	///
 	/// @brief      Create a user record, if called on a existing user the auth is recreated
@@ -73,6 +78,82 @@ public:
 			return true;
 		}
 		return false;
+	}
+
+	///
+	/// @brief Test if a user token is authorized for access.
+	/// @param usr   The user name
+	/// @param token The token
+	/// @return       True on success else false
+	///
+	inline bool isUserTokenAuthorized(const QString& usr, const QString& token)
+	{
+		if(getUserToken(usr) == token.toUtf8())
+		{
+			updateUserUsed(usr);
+			return true;
+		}
+		return false;
+	}
+
+	///
+	/// @brief Update token of a user. It's an alternate login path which is replaced on startup. This token is NOT hashed(!)
+	/// @param user   The user name
+	/// @return       True on success else false
+	///
+	inline bool setUserToken(const QString& user)
+	{
+		QVariantMap map;
+		map["token"] = QCryptographicHash::hash(QUuid::createUuid().toByteArray(), QCryptographicHash::Sha512).toHex();
+
+		VectorPair cond;
+		cond.append(CPair("user", user));
+		return updateRecord(cond, map);
+	}
+
+	///
+	/// @brief Get token of a user. This token is NOT hashed(!)
+	/// @param user   The user name
+	/// @return       The token
+	///
+	inline const QByteArray getUserToken(const QString& user)
+	{
+		QVariantMap results;
+		VectorPair cond;
+		cond.append(CPair("user", user));
+		getRecord(cond, results, QStringList()<<"token");
+
+		return results["token"].toByteArray();
+	}
+
+	///
+	/// @brief update password of given user. The user should be tested (isUserAuthorized) to verify this change
+	/// @param user   The user name
+	/// @param newPw  The new password to set
+	/// @return       True on success else false
+	///
+	inline bool updateUserPassword(const QString& user, const QString& newPw)
+	{
+		QVariantMap map;
+		map["password"] = calcPasswordHashOfUser(user, newPw);
+
+		VectorPair cond;
+		cond.append(CPair("user", user));
+		return updateRecord(cond, map);
+	}
+
+	///
+	/// @brief Reset password of Hyperion user !DANGER! Used in Hyperion main.cpp
+	/// @return       True on success else false
+	///
+	inline bool resetHyperionUser()
+	{
+		QVariantMap map;
+		map["password"] = calcPasswordHashOfUser("Hyperion", "hyperion");
+
+		VectorPair cond;
+		cond.append(CPair("user", "Hyperion"));
+		return updateRecord(cond, map);
 	}
 
 	///
@@ -139,6 +220,22 @@ public:
 		VectorPair cond;
 		cond.append(CPair("id", id));
 		return deleteRecord(cond);
+	}
+
+	///
+	/// @brief      Rename token record by id
+	/// @param[in]  id    The token id
+	/// @param[in]  comment The new comment
+	/// @return     true on success else false
+	///
+	inline bool renameToken(const QString &id, const QString &comment)
+	{
+		QVariantMap map;
+		map["comment"] = comment;
+
+		VectorPair cond;
+		cond.append(CPair("id", id));
+		return updateRecord(cond, map);
 	}
 
 	///

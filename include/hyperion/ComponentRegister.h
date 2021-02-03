@@ -20,25 +20,17 @@ class ComponentRegister : public QObject
 
 public:
 	ComponentRegister(Hyperion* hyperion);
-	~ComponentRegister();
-
-	///
-	/// @brief Enable or disable Hyperion (all components)
-	/// @param state   The new state of Hyperion
-	///
-	/// @return Returns true on success, false when Hyperion is already at the requested state
-	///
-	bool setHyperionEnable(const bool& state);
+	~ComponentRegister() override;
 
 	///
 	/// @brief  Check if a component is currently enabled
 	/// @param  comp   The component from enum
 	/// @return        True if component is running else false. Not found is -1
 	///
-	int isComponentEnabled(const hyperion::Components& comp) const;
+	int isComponentEnabled(hyperion::Components comp) const;
 
 	/// contains all components and their state
-	std::map<hyperion::Components, bool> getRegister() { return _componentStates; };
+	std::map<hyperion::Components, bool> getRegister() const { return _componentStates; }
 
 signals:
 	///
@@ -46,15 +38,21 @@ signals:
 	///	@param comp   The component
 	///	@param state  The new state of the component
 	///
-	void updatedComponentState(const hyperion::Components comp, const bool state);
+	void updatedComponentState(hyperion::Components comp, bool state);
 
 public slots:
 	///
-	/// @brief is called whenever a component change a state, DO NOT CALL FROM API (use hyperion->setComponentState() instead)
+	/// @brief is called whenever a component change a state, DO NOT CALL FROM API, use signal hyperion->compStateChangeRequest
 	///	@param comp   The component
 	///	@param state  The new state of the component
 	///
-	void componentStateChanged(const hyperion::Components comp, const bool activated);
+	void setNewComponentState(hyperion::Components comp, bool activated);
+
+private slots:
+	///
+	/// @brief Handle COMP_ALL changes from Hyperion->compStateChangeRequest
+	///
+	void handleCompStateChangeRequest(hyperion::Components comps, bool activated);
 
 private:
 	///  Hyperion instance
@@ -65,4 +63,6 @@ private:
 	std::map<hyperion::Components, bool> _componentStates;
 	/// on hyperion off we save the previous states of all components
 	std::map<hyperion::Components, bool> _prevComponentStates;
+	// helper to prevent self emit chains
+	bool _inProgress = false;
 };

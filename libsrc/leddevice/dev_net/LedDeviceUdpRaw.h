@@ -1,29 +1,48 @@
-#pragma once
+#ifndef LEDEVICEUDPRAW_H
+#define LEDEVICEUDPRAW_H
 
-// hyperion incluse
+// hyperion includes
 #include "ProviderUdp.h"
 
 ///
-/// Implementation of the LedDevice interface for sending led colors via udp.
+/// Implementation of the LedDevice interface for sending LED colors via UDP
 ///
 class LedDeviceUdpRaw : public ProviderUdp
 {
 public:
-	///
-	/// Constructs specific LedDevice
-	///
-	/// @param deviceConfig json device config
-	///
-	LedDeviceUdpRaw(const QJsonObject &deviceConfig);
 
-	/// constructs leddevice
+	///
+	/// @brief Constructs a LED-device fed via UDP
+	///
+	/// @param deviceConfig Device's configuration as JSON-Object
+	///
+	explicit LedDeviceUdpRaw(const QJsonObject &deviceConfig);
+
+	///
+	/// @brief Constructs the LED-device
+	///
+	/// @param[in] deviceConfig Device's configuration as JSON-Object
+	/// @return LedDevice constructed
+	///
 	static LedDevice* construct(const QJsonObject &deviceConfig);
 
+protected:
+
 	///
-	/// Writes the led color values to the led-device
+	/// @brief Initialise the device's configuration
 	///
-	/// @param ledValues The color-value per led
-	/// @return Zero on succes else negative
+	/// @param[in] deviceConfig the JSON device configuration
+	/// @return True, if success
 	///
-	virtual int write(const std::vector<ColorRgb> &ledValues);
+	bool init(const QJsonObject &deviceConfig) override;
+
+	///
+	/// @brief Writes the RGB-Color values to the LEDs.
+	///
+	/// @param[in] ledValues The RGB-color per LED
+	/// @return Zero on success, else negative
+	///
+	int write(const std::vector<ColorRgb> & ledValues) override;
 };
+
+#endif // LEDEVICEUDPRAW_H

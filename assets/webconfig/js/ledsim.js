@@ -22,7 +22,7 @@ $(document).ready(function() {
 		for(var idx=0; idx<leds.length; idx++)
 		{
 			var led = leds[idx];
-			twoDPaths.push( build2DPath(led.hscan.minimum * canvas_width, led.vscan.minimum * canvas_height, (led.hscan.maximum-led.hscan.minimum) * canvas_width, (led.vscan.maximum-led.vscan.minimum) * canvas_height, 5) );
+			twoDPaths.push( build2DPath(led.hmin * canvas_width, led.vmin * canvas_height, (led.hmax-led.hmin) * canvas_width, (led.vmax-led.vmin) * canvas_height, 5) );
 		}
 	}
 
@@ -131,27 +131,39 @@ $(document).ready(function() {
 			return;
 
 		var useColor = false;
+		var cPos = 0;
 		ledsCanvasNodeCtx.clear();
 		if(typeof colors != "undefined")
 			useColor = true;
+
+		// check size of ledcolors with leds length
+		if(colors && colors.length/3 < leds.length)
+			return;
 
 		for(var idx=0; idx<leds.length; idx++)
 		{
 			var led = leds[idx];
 			// can be used as fallback when Path2D is not available
-			//roundRect(ledsCanvasNodeCtx, led.hscan.minimum * canvas_width, led.vscan.minimum * canvas_height, (led.hscan.maximum-led.hscan.minimum) * canvas_width, (led.vscan.maximum-led.vscan.minimum) * canvas_height, 4, true, colors[idx])
-			//ledsCanvasNodeCtx.fillRect(led.hscan.minimum * canvas_width, led.vscan.minimum * canvas_height, (led.hscan.maximum-led.hscan.minimum) * canvas_width, (led.vscan.maximum-led.vscan.minimum) * canvas_height);
-			
-			ledsCanvasNodeCtx.fillStyle = (useColor) ?  "rgba("+colors[idx].red+","+colors[idx].green+","+colors[idx].blue+",0.9)"  : "hsl("+(idx*360/leds.length)+",100%,50%)";
+			//roundRect(ledsCanvasNodeCtx, led.hmin * canvas_width, led.vmin * canvas_height, (led.hmax-led.hmin) * canvas_width, (led.vmax-led.vmin) * canvas_height, 4, true, colors[idx])
+			//ledsCanvasNodeCtx.fillRect(led.hmin * canvas_width, led.vmin * canvas_height, (led.hmax-led.hmin) * canvas_width, (led.vmax-led.vmin) * canvas_height);
+
+			ledsCanvasNodeCtx.fillStyle = (useColor) ?  "rgba("+colors[cPos]+","+colors[cPos+1]+","+colors[cPos+2]+",0.75)"  : "hsla("+(idx*360/leds.length)+",100%,50%,0.75)";
 			ledsCanvasNodeCtx.fill(twoDPaths[idx]);
 			ledsCanvasNodeCtx.stroke(twoDPaths[idx]);
 
 			if(toggleLedsNum)
 			{
-				ledsCanvasNodeCtx.fillStyle = "blue";
+				//ledsCanvasNodeCtx.shadowOffsetX = 1;
+				//ledsCanvasNodeCtx.shadowOffsetY = 1;
+				//ledsCanvasNodeCtx.shadowColor = "black";
+				//ledsCanvasNodeCtx.shadowBlur = 4;
+				ledsCanvasNodeCtx.fillStyle = "white";
 				ledsCanvasNodeCtx.textAlign = "center";
-				ledsCanvasNodeCtx.fillText(idx, (led.hscan.minimum * canvas_width) + ( ((led.hscan.maximum-led.hscan.minimum) * canvas_width) / 2), (led.vscan.minimum * canvas_height) + ( ((led.vscan.maximum-led.vscan.minimum) * canvas_height) / 2));
+				ledsCanvasNodeCtx.fillText(((led.name) ? led.name : idx), (led.hmin * canvas_width) + ( ((led.hmax-led.hmin) * canvas_width) / 2), (led.vmin * canvas_height) + ( ((led.vmax-led.vmin) * canvas_height) / 2));
 			}
+
+			// increment colorsPosition
+			cPos += 3;
 		}
 	}
 

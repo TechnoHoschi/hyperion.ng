@@ -10,8 +10,9 @@
 
 #include <hyperion/ComponentRegister.h>
 // bonjour wrapper
-
+#ifdef ENABLE_AVAHI
 #include <bonjour/bonjourbrowserwrapper.h>
+#endif
 // priorityMuxer
 
 #include <hyperion/PriorityMuxer.h>
@@ -21,91 +22,156 @@
 
 // qt
 #include <QDateTime>
+#include <QVariant>
 
 // Image to led map helper
 #include <hyperion/ImageProcessor.h>
 
 using namespace hyperion;
 
-JsonCB::JsonCB(Hyperion* hyperion, QObject* parent)
+JsonCB::JsonCB(QObject* parent)
 	: QObject(parent)
-	, _hyperion(hyperion)
-	, _componentRegister(& _hyperion->getComponentRegister())
+	, _hyperion(nullptr)
+	, _componentRegister(nullptr)
+	#ifdef ENABLE_AVAHI
 	, _bonjour(BonjourBrowserWrapper::getInstance())
-	, _prioMuxer(_hyperion->getMuxerInstance())
+	#endif
+	, _prioMuxer(nullptr)
 {
 	_availableCommands << "components-update" << "sessions-update" << "priorities-update" << "imageToLedMapping-update"
-	<< "adjustment-update" << "videomode-update" << "effects-update" << "settings-update" << "leds-update" << "instance-update";
+	<< "adjustment-update" << "videomode-update" << "effects-update" << "settings-update" << "leds-update" << "instance-update" << "token-update";
 }
 
-bool JsonCB::subscribeFor(const QString& type)
+bool JsonCB::subscribeFor(const QString& type, bool unsubscribe)
 {
 	if(!_availableCommands.contains(type))
 		return false;
 
+	if(unsubscribe)
+		_subscribedCommands.removeAll(type);
+	else
+		_subscribedCommands << type;
+
 	if(type == "components-update")
 	{
-		_subscribedCommands << type;
-		connect(_componentRegister, &ComponentRegister::updatedComponentState, this, &JsonCB::handleComponentState, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_componentRegister, &ComponentRegister::updatedComponentState, this, &JsonCB::handleComponentState);
+		else
+			connect(_componentRegister, &ComponentRegister::updatedComponentState, this, &JsonCB::handleComponentState, Qt::UniqueConnection);
 	}
 
 	if(type == "sessions-update")
 	{
-		_subscribedCommands << type;
-		connect(_bonjour, &BonjourBrowserWrapper::browserChange, this, &JsonCB::handleBonjourChange, Qt::UniqueConnection);
+#ifdef ENABLE_AVAHI
+		if(unsubscribe)
+			disconnect(_bonjour, &BonjourBrowserWrapper::browserChange, this, &JsonCB::handleBonjourChange);
+		else
+			connect(_bonjour, &BonjourBrowserWrapper::browserChange, this, &JsonCB::handleBonjourChange, Qt::UniqueConnection);
+#endif
 	}
 
 	if(type == "priorities-update")
 	{
-		_subscribedCommands << type;
-		connect(_prioMuxer, &PriorityMuxer::prioritiesChanged, this, &JsonCB::handlePriorityUpdate, Qt::UniqueConnection);
-		connect(_prioMuxer, &PriorityMuxer::autoSelectChanged, this, &JsonCB::handlePriorityUpdate, Qt::UniqueConnection);
+		if (unsubscribe)
+			disconnect(_prioMuxer,0 ,0 ,0);
+		else
+			connect(_prioMuxer, &PriorityMuxer::prioritiesChanged, this, &JsonCB::handlePriorityUpdate, Qt::UniqueConnection);
 	}
 
 	if(type == "imageToLedMapping-update")
 	{
-		_subscribedCommands << type;
-		connect(_hyperion, &Hyperion::imageToLedsMappingChanged, this, &JsonCB::handleImageToLedsMappingChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_hyperion, &Hyperion::imageToLedsMappingChanged, this, &JsonCB::handleImageToLedsMappingChange);
+		else
+			connect(_hyperion, &Hyperion::imageToLedsMappingChanged, this, &JsonCB::handleImageToLedsMappingChange, Qt::UniqueConnection);
 	}
 
 	if(type == "adjustment-update")
 	{
-		_subscribedCommands << type;
-		connect(_hyperion, &Hyperion::adjustmentChanged, this, &JsonCB::handleAdjustmentChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_hyperion, &Hyperion::adjustmentChanged, this, &JsonCB::handleAdjustmentChange);
+		else
+			connect(_hyperion, &Hyperion::adjustmentChanged, this, &JsonCB::handleAdjustmentChange, Qt::UniqueConnection);
 	}
 
 	if(type == "videomode-update")
 	{
-		_subscribedCommands << type;
-		connect(_hyperion, &Hyperion::newVideoMode, this, &JsonCB::handleVideoModeChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_hyperion, &Hyperion::newVideoMode, this, &JsonCB::handleVideoModeChange);
+		else
+			connect(_hyperion, &Hyperion::newVideoMode, this, &JsonCB::handleVideoModeChange, Qt::UniqueConnection);
 	}
 
 	if(type == "effects-update")
 	{
-		_subscribedCommands << type;
-		connect(_hyperion, &Hyperion::effectListUpdated, this, &JsonCB::handleEffectListChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_hyperion, &Hyperion::effectListUpdated, this, &JsonCB::handleEffectListChange);
+		else
+			connect(_hyperion, &Hyperion::effectListUpdated, this, &JsonCB::handleEffectListChange, Qt::UniqueConnection);
 	}
 
 	if(type == "settings-update")
 	{
-		_subscribedCommands << type;
-		connect(_hyperion, &Hyperion::settingsChanged, this, &JsonCB::handleSettingsChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_hyperion, &Hyperion::settingsChanged, this, &JsonCB::handleSettingsChange);
+		else
+			connect(_hyperion, &Hyperion::settingsChanged, this, &JsonCB::handleSettingsChange, Qt::UniqueConnection);
 	}
 
 	if(type == "leds-update")
 	{
-		_subscribedCommands << type;
-		connect(_hyperion, &Hyperion::settingsChanged, this, &JsonCB::handleLedsConfigChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(_hyperion, &Hyperion::settingsChanged, this, &JsonCB::handleLedsConfigChange);
+		else
+			connect(_hyperion, &Hyperion::settingsChanged, this, &JsonCB::handleLedsConfigChange, Qt::UniqueConnection);
 	}
 
 
 	if(type == "instance-update")
 	{
-		_subscribedCommands << type;
-		connect(HyperionIManager::getInstance(), &HyperionIManager::change, this, &JsonCB::handleInstanceChange, Qt::UniqueConnection);
+		if(unsubscribe)
+			disconnect(HyperionIManager::getInstance(), &HyperionIManager::change, this, &JsonCB::handleInstanceChange);
+		else
+			connect(HyperionIManager::getInstance(), &HyperionIManager::change, this, &JsonCB::handleInstanceChange, Qt::UniqueConnection);
+	}
+
+	if (type == "token-update")
+	{
+		if (unsubscribe)
+			disconnect(AuthManager::getInstance(), &AuthManager::tokenChange, this, &JsonCB::handleTokenChange);
+		else
+			connect(AuthManager::getInstance(), &AuthManager::tokenChange, this, &JsonCB::handleTokenChange, Qt::UniqueConnection);
 	}
 
 	return true;
+}
+
+void JsonCB::resetSubscriptions()
+{
+	for(const auto & entry : getSubscribedCommands())
+	{
+		subscribeFor(entry, true);
+	}
+}
+
+void JsonCB::setSubscriptionsTo(Hyperion* hyperion)
+{
+	// get current subs
+	QStringList currSubs(getSubscribedCommands());
+
+	// stop subs
+	resetSubscriptions();
+
+	// update pointer
+	_hyperion = hyperion;
+	_componentRegister = &_hyperion->getComponentRegister();
+	_prioMuxer = _hyperion->getMuxerInstance();
+
+	// re-apply subs
+	for(const auto & entry : currSubs)
+	{
+		subscribeFor(entry);
+	}
 }
 
 void JsonCB::doCallback(const QString& cmd, const QVariant& data)
@@ -121,7 +187,7 @@ void JsonCB::doCallback(const QString& cmd, const QVariant& data)
 	emit newCallback(obj);
 }
 
-void JsonCB::handleComponentState(const hyperion::Components comp, const bool state)
+void JsonCB::handleComponentState(hyperion::Components comp, bool state)
 {
 	QJsonObject data;
 	data["name"] = componentToIdString(comp);
@@ -129,7 +195,7 @@ void JsonCB::handleComponentState(const hyperion::Components comp, const bool st
 
 	doCallback("components-update", QVariant(data));
 }
-
+#ifdef ENABLE_AVAHI
 void JsonCB::handleBonjourChange(const QMap<QString,BonjourRecord>& bRegisters)
 {
 	QJsonArray data;
@@ -148,7 +214,7 @@ void JsonCB::handleBonjourChange(const QMap<QString,BonjourRecord>& bRegisters)
 
 	doCallback("sessions-update", QVariant(data));
 }
-
+#endif
 void JsonCB::handlePriorityUpdate()
 {
 	QJsonObject data;
@@ -158,7 +224,7 @@ void JsonCB::handlePriorityUpdate()
 	activePriorities.removeAll(255);
 	int currentPriority = _prioMuxer->getCurrentPriority();
 
-	foreach (int priority, activePriorities) {
+	for (int priority : activePriorities) {
 		const Hyperion::InputInfo priorityInfo = _prioMuxer->getInputInfo(priority);
 		QJsonObject item;
 		item["priority"] = priority;
@@ -211,7 +277,7 @@ void JsonCB::handlePriorityUpdate()
 	doCallback("priorities-update", QVariant(data));
 }
 
-void JsonCB::handleImageToLedsMappingChange(const int& mappingType)
+void JsonCB::handleImageToLedsMappingChange(int mappingType)
 {
 	QJsonObject data;
 	data["imageToLedMappingType"] = ImageProcessor::mappingTypeToStr(mappingType);
@@ -289,7 +355,7 @@ void JsonCB::handleAdjustmentChange()
 	doCallback("adjustment-update", QVariant(adjustmentArray));
 }
 
-void JsonCB::handleVideoModeChange(const VideoMode& mode)
+void JsonCB::handleVideoModeChange(VideoMode mode)
 {
 	QJsonObject data;
 	data["videomode"] = QString(videoMode2String(mode));
@@ -314,7 +380,7 @@ void JsonCB::handleEffectListChange()
 	doCallback("effects-update", QVariant(effects));
 }
 
-void JsonCB::handleSettingsChange(const settings::type& type, const QJsonDocument& data)
+void JsonCB::handleSettingsChange(settings::type type, const QJsonDocument& data)
 {
 	QJsonObject dat;
 	if(data.isObject())
@@ -325,7 +391,7 @@ void JsonCB::handleSettingsChange(const settings::type& type, const QJsonDocumen
 	doCallback("settings-update", QVariant(dat));
 }
 
-void JsonCB::handleLedsConfigChange(const settings::type& type, const QJsonDocument& data)
+void JsonCB::handleLedsConfigChange(settings::type type, const QJsonDocument& data)
 {
 	if(type == settings::LEDS)
 	{
@@ -349,4 +415,18 @@ void JsonCB::handleInstanceChange()
 		arr.append(obj);
 	}
 	doCallback("instance-update", QVariant(arr));
+}
+
+void JsonCB::handleTokenChange(const QVector<AuthManager::AuthDefinition> &def)
+{
+	QJsonArray arr;
+	for (const auto &entry : def)
+	{
+		QJsonObject sub;
+		sub["comment"] = entry.comment;
+		sub["id"] = entry.id;
+		sub["last_use"] = entry.lastUse;
+		arr.push_back(sub);
+	}
+	doCallback("token-update", QVariant(arr));
 }

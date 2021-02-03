@@ -8,43 +8,44 @@
 #include <QJsonObject>
 #include <QTimer>
 
-AuthManager* AuthManager::manager = nullptr;
+AuthManager *AuthManager::manager = nullptr;
 
-AuthManager::AuthManager(QObject* parent)
+AuthManager::AuthManager(QObject *parent, bool readonlyMode)
 	: QObject(parent)
-	, _authTable(new AuthTable(this))
-	, _metaTable(new MetaTable(this))
+	, _authTable(new AuthTable("", this, readonlyMode))
+	, _metaTable(new MetaTable(this, readonlyMode))
 	, _pendingRequests()
 	, _authRequired(true)
 	, _timer(new QTimer(this))
+	, _authBlockTimer(new QTimer(this))
 {
 	AuthManager::manager = this;
 
 	// get uuid
 	_uuid = _metaTable->getUUID();
 
+	// Register meta
+	qRegisterMetaType<QVector<AuthManager::AuthDefinition>>("QVector<AuthManager::AuthDefinition>");
+
 	// setup timer
 	_timer->setInterval(1000);
 	connect(_timer, &QTimer::timeout, this, &AuthManager::checkTimeout);
 
+	// setup authBlockTimer
+	_authBlockTimer->setInterval(60000);
+	connect(_authBlockTimer, &QTimer::timeout, this, &AuthManager::checkAuthBlockTimeout);
+
 	// init with default user and password
-	if(!_authTable->userExist("Hyperion"))
+	if (!_authTable->userExist("Hyperion"))
 	{
-		_authTable->createUser("Hyperion","hyperion");
+		_authTable->createUser("Hyperion", "hyperion");
 	}
+
+	// update Hyperion user token on startup
+	_authTable->setUserToken("Hyperion");
 }
 
-bool & AuthManager::isAuthRequired()
-{
-	return _authRequired;
-}
-
-bool & AuthManager::isLocalAuthRequired()
-{
-	return _localAuthRequired;
-}
-
-const AuthManager::AuthDefinition AuthManager::createToken(const QString& comment)
+AuthManager::AuthDefinition AuthManager::createToken(const QString &comment)
 {
 	const QString token = QUuid::createUuid().toString().mid(1, 36);
 	const QString id = QUuid::createUuid().toString().mid(1, 36).left(5);
@@ -56,14 +57,15 @@ const AuthManager::AuthDefinition AuthManager::createToken(const QString& commen
 	def.token = token;
 	def.id = id;
 
+	emit tokenChange(getTokenList());
 	return def;
 }
 
-const QVector<AuthManager::AuthDefinition> AuthManager::getTokenList()
+QVector<AuthManager::AuthDefinition> AuthManager::getTokenList() const
 {
 	QVector<QVariantMap> vector = _authTable->getTokenList();
 	QVector<AuthManager::AuthDefinition> finalVec;
-	for(const auto& entry : vector)
+	for (const auto &entry : vector)
 	{
 		AuthDefinition def;
 		def.comment = entry["comment"].toString();
@@ -71,79 +73,167 @@ const QVector<AuthManager::AuthDefinition> AuthManager::getTokenList()
 		def.lastUse = entry["last_use"].toString();
 
 		// don't add empty ids
-		if(!entry["id"].toString().isEmpty())
+		if (!entry["id"].toString().isEmpty())
 			finalVec.append(def);
 	}
 	return finalVec;
 }
 
-bool AuthManager::isUserAuthorized(const QString& user, const QString& pw)
+QString AuthManager::getUserToken(const QString &usr) const
 {
-	return _authTable->isUserAuthorized(user, pw);
+	QString tok = _authTable->getUserToken(usr);
+	return QString(_authTable->getUserToken(usr));
 }
 
-bool AuthManager::isTokenAuthorized(const QString& token)
+void AuthManager::setAuthBlock(bool user)
 {
-	return _authTable->tokenExist(token);
+	// current timestamp +10 minutes
+	if (user)
+		_userAuthAttempts.append(QDateTime::currentMSecsSinceEpoch() + 600000);
+	else
+		_tokenAuthAttempts.append(QDateTime::currentMSecsSinceEpoch() + 600000);
+
+	_authBlockTimer->start();
 }
 
-void AuthManager::setNewTokenRequest(QObject* caller, const QString& comment, const QString& id)
+bool AuthManager::isUserAuthorized(const QString &user, const QString &pw)
 {
-	if(!_pendingRequests.contains(id))
+	if (isUserAuthBlocked())
+		return false;
+
+	if (!_authTable->isUserAuthorized(user, pw))
 	{
-		AuthDefinition newDef {id, comment, caller, uint64_t(QDateTime::currentMSecsSinceEpoch()+60000)};
+		setAuthBlock(true);
+		return false;
+	}
+	return true;
+}
+
+bool AuthManager::isTokenAuthorized(const QString &token)
+{
+	if (isTokenAuthBlocked())
+		return false;
+
+	if (!_authTable->tokenExist(token))
+	{
+		setAuthBlock();
+		return false;
+	}
+	// timestamp update
+	tokenChange(getTokenList());
+	return true;
+}
+
+bool AuthManager::isUserTokenAuthorized(const QString &usr, const QString &token)
+{
+	if (isUserAuthBlocked())
+		return false;
+
+	if (!_authTable->isUserTokenAuthorized(usr, token))
+	{
+		setAuthBlock(true);
+		return false;
+	}
+	return true;
+}
+
+bool AuthManager::updateUserPassword(const QString &user, const QString &pw, const QString &newPw)
+{
+	if (isUserAuthorized(user, pw))
+		return _authTable->updateUserPassword(user, newPw);
+
+	return false;
+}
+
+bool AuthManager::resetHyperionUser()
+{
+	return _authTable->resetHyperionUser();
+}
+
+void AuthManager::setNewTokenRequest(QObject *caller, const QString &comment, const QString &id, const int &tan)
+{
+	if (!_pendingRequests.contains(id))
+	{
+		AuthDefinition newDef{id, comment, caller, tan, uint64_t(QDateTime::currentMSecsSinceEpoch() + 180000)};
 		_pendingRequests[id] = newDef;
 		_timer->start();
 		emit newPendingTokenRequest(id, comment);
 	}
 }
 
-bool AuthManager::acceptTokenRequest(const QString& id)
+void AuthManager::cancelNewTokenRequest(QObject *caller, const QString &, const QString &id)
 {
-	if(_pendingRequests.contains(id))
+	if (_pendingRequests.contains(id))
 	{
-		const QString token = QUuid::createUuid().toString().remove("{").remove("}");
-		AuthDefinition def = _pendingRequests.take(id);
-		_authTable->createToken(token, def.comment, id);
-		emit tokenResponse(true, def.caller, token, def.comment, id);
-		return true;
+		AuthDefinition def = _pendingRequests.value(id);
+		if (def.caller == caller)
+			_pendingRequests.remove(id);
+		emit newPendingTokenRequest(id, "");
 	}
-	return false;
 }
 
-bool AuthManager::denyTokenRequest(const QString& id)
+void AuthManager::handlePendingTokenRequest(const QString &id, bool accept)
 {
-	if(_pendingRequests.contains(id))
+	if (_pendingRequests.contains(id))
 	{
 		AuthDefinition def = _pendingRequests.take(id);
-		emit tokenResponse(false, def.caller, QString(), def.comment, id);
+
+		if (accept)
+		{
+			const QString token = QUuid::createUuid().toString().remove("{").remove("}");
+			_authTable->createToken(token, def.comment, id);
+			emit tokenResponse(true, def.caller, token, def.comment, id, def.tan);
+			emit tokenChange(getTokenList());
+		}
+		else
+		{
+			emit tokenResponse(false, def.caller, QString(), def.comment, id, def.tan);
+		}
+	}
+}
+
+QVector<AuthManager::AuthDefinition> AuthManager::getPendingRequests() const
+{
+	QVector<AuthManager::AuthDefinition> finalVec;
+	for (const auto &entry : _pendingRequests)
+	{
+		AuthDefinition def;
+		def.comment = entry.comment;
+		def.id = entry.id;
+		def.timeoutTime = entry.timeoutTime - QDateTime::currentMSecsSinceEpoch();
+		finalVec.append(def);
+	}
+	return finalVec;
+}
+
+bool AuthManager::renameToken(const QString &id, const QString &comment)
+{
+	if (_authTable->renameToken(id, comment))
+	{
+		emit tokenChange(getTokenList());
 		return true;
 	}
 	return false;
 }
 
-const QMap<QString, AuthManager::AuthDefinition> AuthManager::getPendingRequests()
+bool AuthManager::deleteToken(const QString &id)
 {
-	return _pendingRequests;
-}
-
-bool AuthManager::deleteToken(const QString& id)
-{
-	if(_authTable->deleteToken(id))
+	if (_authTable->deleteToken(id))
 	{
-		//emit tokenDeleted(token);
+		emit tokenChange(getTokenList());
 		return true;
 	}
 	return false;
 }
 
-void AuthManager::handleSettingsUpdate(const settings::type& type, const QJsonDocument& config)
+void AuthManager::handleSettingsUpdate(settings::type type, const QJsonDocument &config)
 {
-	if(type == settings::NETWORK)
+	if (type == settings::NETWORK)
 	{
-		const QJsonObject& obj = config.object();
+		const QJsonObject &obj = config.object();
 		_authRequired = obj["apiAuth"].toBool(true);
 		_localAuthRequired = obj["localApiAuth"].toBool(false);
+		_localAdminAuthRequired = obj["localAdminAuth"].toBool(true);
 	}
 }
 
@@ -154,16 +244,43 @@ void AuthManager::checkTimeout()
 	QMapIterator<QString, AuthDefinition> i(_pendingRequests);
 	while (i.hasNext())
 	{
-	    i.next();
+		i.next();
 
-		const AuthDefinition& def = i.value();
-		if(def.timeoutTime <= now)
+		const AuthDefinition &def = i.value();
+		if (def.timeoutTime <= now)
 		{
-			emit tokenResponse(false, def.caller, QString(), def.comment, def.id);
+			emit tokenResponse(false, def.caller, QString(), def.comment, def.id, def.tan);
 			_pendingRequests.remove(i.key());
 		}
 	}
 	// abort if empty
-	if(_pendingRequests.isEmpty())
+	if (_pendingRequests.isEmpty())
 		_timer->stop();
+}
+
+void AuthManager::checkAuthBlockTimeout()
+{
+	// handle user auth block
+	for (auto it = _userAuthAttempts.begin(); it != _userAuthAttempts.end(); it++)
+	{
+		// after 10 minutes, we remove the entry
+		if (*it < (uint64_t)QDateTime::currentMSecsSinceEpoch())
+		{
+			_userAuthAttempts.erase(it--);
+		}
+	}
+
+	// handle token auth block
+	for (auto it = _tokenAuthAttempts.begin(); it != _tokenAuthAttempts.end(); it++)
+	{
+		// after 10 minutes, we remove the entry
+		if (*it < (uint64_t)QDateTime::currentMSecsSinceEpoch())
+		{
+			_tokenAuthAttempts.erase(it--);
+		}
+	}
+
+	// if the lists are empty we stop
+	if (_userAuthAttempts.empty() && _tokenAuthAttempts.empty())
+		_authBlockTimer->stop();
 }

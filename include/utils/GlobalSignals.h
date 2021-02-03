@@ -20,12 +20,13 @@ public:
         static GlobalSignals instance;
         return & instance;
     }
+
 private:
-    GlobalSignals() {}
+    GlobalSignals() = default;
 
 public:
-    GlobalSignals(GlobalSignals const&)   = delete;
-    void operator=(GlobalSignals const&)  = delete;
+    GlobalSignals(GlobalSignals const&)  = delete;
+    void operator=(GlobalSignals const&) = delete;
 
 signals:
 	///////////////////////////////////////
@@ -54,18 +55,14 @@ signals:
 	/// @param[in] owner       Specific owner string, might be empty
 	/// @param[in] smooth_cfg  The smooth id to use
 	///
-	void registerGlobalInput(const int priority, const hyperion::Components& component, const QString& origin = "External", const QString& owner = "", unsigned smooth_cfg = 0);
+	void registerGlobalInput(int priority, hyperion::Components component, const QString& origin = "External", const QString& owner = "", unsigned smooth_cfg = 0);
 
 	///
 	/// @brief PIPE the clear command for the global priority channel over HyperionDaemon to Hyperion class
-	/// @param[in] priority    The priority channel
+	/// @param[in] priority       The priority channel (-1 to clear all possible priorities)
+	/// @param[in] forceclearAll  Force the clear
 	///
-	void clearGlobalInput(int priority);
-
-	///
-	/// @brief PIPE the clearAll command over HyperionDaemon to Hyperion class
-	///
-	void clearAllGlobalInput(bool forceClearAll=false);
+	void clearGlobalInput(int priority, bool forceClearAll=false);
 
 	///
 	/// @brief PIPE external images over HyperionDaemon to Hyperion class
@@ -74,7 +71,7 @@ signals:
 	/// @param[in] timeout_ms  The timeout in milliseconds
 	/// @param     clearEffect Should be true when NOT called from an effect
 	///
-	void setGlobalImage(const int priority, const Image<ColorRgb>& image, const int timeout_ms, const bool& clearEffect = true);
+	void setGlobalImage(int priority, const Image<ColorRgb>& image, int timeout_ms, bool clearEffect = true);
 
 	///
 	/// @brief PIPE external color message over HyperionDaemon to Hyperion class
@@ -84,7 +81,7 @@ signals:
 	/// @param[in] origin      The setter
 	/// @param     clearEffect Should be true when NOT called from an effect
 	///
-	void setGlobalColor(const int priority, const ColorRgb &ledColor, const int timeout_ms, const QString& origin = "External" ,bool clearEffects = true);
+	void setGlobalColor(int priority, const std::vector<ColorRgb> &ledColor, int timeout_ms, const QString& origin = "External" ,bool clearEffects = true);
 
 	///////////////////////////////////////
 	//////////// FROM HYPERION ////////////
@@ -95,5 +92,13 @@ signals:
 	/// @param[in] priority    The priority channel
 	///
 	void globalRegRequired(int priority);
+
+	///
+	/// @brief Tell v4l2/screen capture the listener state
+	/// @param component  The component to handle
+	/// @param hyperionInd The Hyperion instance index as identifier
+	/// @param listen  True when listening, else false
+	///
+	void requestSource(hyperion::Components component, int hyperionInd, bool listen);
 
 };

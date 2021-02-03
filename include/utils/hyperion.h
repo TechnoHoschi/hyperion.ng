@@ -34,13 +34,15 @@ namespace hyperion {
 			}
 			if ( fgTypeConfig.contains("color") )
 			{
-				ColorRgb fg_color = {
-					(uint8_t)FGCONFIG_ARRAY.at(0).toInt(0),
-					(uint8_t)FGCONFIG_ARRAY.at(1).toInt(0),
-					(uint8_t)FGCONFIG_ARRAY.at(2).toInt(0)
+				std::vector<ColorRgb> fg_color = {
+					ColorRgb {
+						static_cast<uint8_t>(FGCONFIG_ARRAY.at(0).toInt(0)),
+						static_cast<uint8_t>(FGCONFIG_ARRAY.at(1).toInt(0)),
+						static_cast<uint8_t>(FGCONFIG_ARRAY.at(2).toInt(0))
+					}
 				};
 				hyperion->setColor(FG_PRIORITY, fg_color, fg_duration_ms);
-				Info(Logger::getInstance("HYPERION"),"Initial foreground color set (%d %d %d)",fg_color.red,fg_color.green,fg_color.blue);
+				Info(Logger::getInstance("HYPERION"),"Initial foreground color set (%d %d %d)",fg_color.at(0).red,fg_color.at(0).green,fg_color.at(0).blue);
 			}
 			else
 			{
@@ -56,73 +58,50 @@ namespace hyperion {
 		return stringToColorOrder(deviceConfig["colorOrder"].toString("rgb"));
 	}
 
-	RgbTransform* createRgbTransform(const QJsonObject& colorConfig)
+	RgbTransform createRgbTransform(const QJsonObject& colorConfig)
 	{
 		const double backlightThreshold = colorConfig["backlightThreshold"].toDouble(0.0);
 		const bool   backlightColored   = colorConfig["backlightColored"].toBool(false);
-		const double brightness    = colorConfig["brightness"].toInt(100);
-		const double brightnessComp= colorConfig["brightnessCompensation"].toInt(100);
-		const double gammaR        = colorConfig["gammaRed"].toDouble(1.0);
-		const double gammaG        = colorConfig["gammaGreen"].toDouble(1.0);
-		const double gammaB        = colorConfig["gammaBlue"].toDouble(1.0);
+		const int brightness			= colorConfig["brightness"].toInt(100);
+		const int brightnessComp		= colorConfig["brightnessCompensation"].toInt(100);
+		const double gammaR             = colorConfig["gammaRed"].toDouble(1.0);
+		const double gammaG             = colorConfig["gammaGreen"].toDouble(1.0);
+		const double gammaB             = colorConfig["gammaBlue"].toDouble(1.0);
 
-		RgbTransform* transform = new RgbTransform(gammaR, gammaG, gammaB, backlightThreshold, backlightColored, brightness, brightnessComp);
-		return transform;
+		return RgbTransform(gammaR, gammaG, gammaB, backlightThreshold, backlightColored, static_cast<uint8_t>(brightness), static_cast<uint8_t>(brightnessComp));
 	}
 
-	RgbChannelAdjustment* createRgbChannelAdjustment(const QJsonObject& colorConfig, const QString channelName, const int defaultR, const int defaultG, const int defaultB)
+	RgbChannelAdjustment createRgbChannelAdjustment(const QJsonObject& colorConfig, const QString& channelName, int defaultR, int defaultG, int defaultB)
 	{
 		const QJsonArray& channelConfig  = colorConfig[channelName].toArray();
-		RgbChannelAdjustment* adjustment =  new RgbChannelAdjustment(
-			channelConfig[0].toInt(defaultR),
-			channelConfig[1].toInt(defaultG),
-			channelConfig[2].toInt(defaultB),
-			"ChannelAdjust_"+channelName.toUpper()
+		return RgbChannelAdjustment(
+			static_cast<uint8_t>(channelConfig[0].toInt(defaultR)),
+			static_cast<uint8_t>(channelConfig[1].toInt(defaultG)),
+			static_cast<uint8_t>(channelConfig[2].toInt(defaultB)),
+			"ChannelAdjust_" + channelName.toUpper()
 		);
-		return adjustment;
 	}
 
-	ColorAdjustment * createColorAdjustment(const QJsonObject & adjustmentConfig)
+	ColorAdjustment* createColorAdjustment(const QJsonObject & adjustmentConfig)
 	{
 		const QString id = adjustmentConfig["id"].toString("default");
 
-		RgbChannelAdjustment * blackAdjustment   = createRgbChannelAdjustment(adjustmentConfig, "black"  ,   0,  0,  0);
-		RgbChannelAdjustment * whiteAdjustment   = createRgbChannelAdjustment(adjustmentConfig, "white"  , 255,255,255);
-		RgbChannelAdjustment * redAdjustment     = createRgbChannelAdjustment(adjustmentConfig, "red"    , 255,  0,  0);
-		RgbChannelAdjustment * greenAdjustment   = createRgbChannelAdjustment(adjustmentConfig, "green"  ,   0,255,  0);
-		RgbChannelAdjustment * blueAdjustment    = createRgbChannelAdjustment(adjustmentConfig, "blue"   ,   0,  0,255);
-		RgbChannelAdjustment * cyanAdjustment    = createRgbChannelAdjustment(adjustmentConfig, "cyan"   ,   0,255,255);
-		RgbChannelAdjustment * magentaAdjustment = createRgbChannelAdjustment(adjustmentConfig, "magenta", 255,  0,255);
-		RgbChannelAdjustment * yellowAdjustment  = createRgbChannelAdjustment(adjustmentConfig, "yellow" , 255,255,  0);
-		RgbTransform         * rgbTransform      = createRgbTransform(adjustmentConfig);
-
 		ColorAdjustment * adjustment = new ColorAdjustment();
 		adjustment->_id = id;
-		adjustment->_rgbBlackAdjustment   = *blackAdjustment;
-		adjustment->_rgbWhiteAdjustment   = *whiteAdjustment;
-		adjustment->_rgbRedAdjustment     = *redAdjustment;
-		adjustment->_rgbGreenAdjustment   = *greenAdjustment;
-		adjustment->_rgbBlueAdjustment    = *blueAdjustment;
-		adjustment->_rgbCyanAdjustment    = *cyanAdjustment;
-		adjustment->_rgbMagentaAdjustment = *magentaAdjustment;
-		adjustment->_rgbYellowAdjustment  = *yellowAdjustment;
-		adjustment->_rgbTransform         = *rgbTransform;
-
-		// Cleanup the allocated individual adjustments
-		delete blackAdjustment;
-		delete whiteAdjustment;
-		delete redAdjustment;
-		delete greenAdjustment;
-		delete blueAdjustment;
-		delete cyanAdjustment;
-		delete magentaAdjustment;
-		delete yellowAdjustment;
-		delete rgbTransform;
+		adjustment->_rgbBlackAdjustment   = createRgbChannelAdjustment(adjustmentConfig, "black"  ,   0,  0,  0);
+		adjustment->_rgbWhiteAdjustment   = createRgbChannelAdjustment(adjustmentConfig, "white"  , 255,255,255);
+		adjustment->_rgbRedAdjustment     = createRgbChannelAdjustment(adjustmentConfig, "red"    , 255,  0,  0);
+		adjustment->_rgbGreenAdjustment   = createRgbChannelAdjustment(adjustmentConfig, "green"  ,   0,255,  0);
+		adjustment->_rgbBlueAdjustment    = createRgbChannelAdjustment(adjustmentConfig, "blue"   ,   0,  0,255);
+		adjustment->_rgbCyanAdjustment    = createRgbChannelAdjustment(adjustmentConfig, "cyan"   ,   0,255,255);
+		adjustment->_rgbMagentaAdjustment = createRgbChannelAdjustment(adjustmentConfig, "magenta", 255,  0,255);
+		adjustment->_rgbYellowAdjustment  = createRgbChannelAdjustment(adjustmentConfig, "yellow" , 255,255,  0);
+		adjustment->_rgbTransform         = createRgbTransform(adjustmentConfig);
 
 		return adjustment;
 	}
 
-	MultiColorAdjustment * createLedColorsAdjustment(const unsigned ledCnt, const QJsonObject & colorConfig)
+	MultiColorAdjustment * createLedColorsAdjustment(int ledCnt, const QJsonObject & colorConfig)
 	{
 		// Create the result, the transforms are added to this
 		MultiColorAdjustment * adjustment = new MultiColorAdjustment(ledCnt);
@@ -142,13 +121,13 @@ namespace hyperion {
 			{
 				// Special case for indices '*' => all leds
 				adjustment->setAdjustmentForLed(colorAdjustment->_id, 0, ledCnt-1);
-				//Info(_log, "ColorAdjustment '%s' => [0; %d]", QSTRING_CSTR(colorAdjustment->_id), ledCnt-1);
+				//Info(Logger::getInstance("HYPERION"), "ColorAdjustment '%s' => [0-%d]", QSTRING_CSTR(colorAdjustment->_id), ledCnt-1);
 				continue;
 			}
 
 			if (!overallExp.exactMatch(ledIndicesStr))
 			{
-				//Error(_log, "Given led indices %d not correct format: %s", i, QSTRING_CSTR(ledIndicesStr));
+				//Error(Logger::getInstance("HYPERION"), "Given led indices %d not correct format: %s", i, QSTRING_CSTR(ledIndicesStr));
 				continue;
 			}
 
@@ -175,7 +154,7 @@ namespace hyperion {
 					ss << index;
 				}
 			}
-			//Info(_log, "ColorAdjustment '%s' => [%s]", QSTRING_CSTR(colorAdjustment->_id), ss.str().c_str());
+			//Info(Logger::getInstance("HYPERION"), "ColorAdjustment '%s' => [%s]", QSTRING_CSTR(colorAdjustment->_id), ss.str().c_str());
 		}
 
 		return adjustment;
@@ -192,86 +171,30 @@ namespace hyperion {
 	{
 		LedString ledString;
 		const QString deviceOrderStr = colorOrderToString(deviceOrder);
-		int maxLedId = ledConfigArray.size();
 
 		for (signed i = 0; i < ledConfigArray.size(); ++i)
 		{
-			const QJsonObject& index = ledConfigArray[i].toObject();
-
+			const QJsonObject& ledConfig = ledConfigArray[i].toObject();
 			Led led;
-			led.index = index["index"].toInt();
-			led.clone = index["clone"].toInt(-1);
-			if ( led.clone < -1 || led.clone >= maxLedId )
+
+			led.minX_frac = qMax(0.0, qMin(1.0, ledConfig["hmin"].toDouble()));
+			led.maxX_frac = qMax(0.0, qMin(1.0, ledConfig["hmax"].toDouble()));
+			led.minY_frac = qMax(0.0, qMin(1.0, ledConfig["vmin"].toDouble()));
+			led.maxY_frac = qMax(0.0, qMin(1.0, ledConfig["vmax"].toDouble()));
+			// Fix if the user swapped min and max
+			if (led.minX_frac > led.maxX_frac)
 			{
-				//Warning(_log, "LED %d: clone index of %d is out of range, clone ignored", led.index, led.clone);
-				led.clone = -1;
+				std::swap(led.minX_frac, led.maxX_frac);
+			}
+			if (led.minY_frac > led.maxY_frac)
+			{
+				std::swap(led.minY_frac, led.maxY_frac);
 			}
 
-			if ( led.clone < 0 )
-			{
-				const QJsonObject& hscanConfig = ledConfigArray[i].toObject()["hscan"].toObject();
-				const QJsonObject& vscanConfig = ledConfigArray[i].toObject()["vscan"].toObject();
-				led.minX_frac = qMax(0.0, qMin(1.0, hscanConfig["minimum"].toDouble()));
-				led.maxX_frac = qMax(0.0, qMin(1.0, hscanConfig["maximum"].toDouble()));
-				led.minY_frac = qMax(0.0, qMin(1.0, vscanConfig["minimum"].toDouble()));
-				led.maxY_frac = qMax(0.0, qMin(1.0, vscanConfig["maximum"].toDouble()));
-				// Fix if the user swapped min and max
-				if (led.minX_frac > led.maxX_frac)
-				{
-					std::swap(led.minX_frac, led.maxX_frac);
-				}
-				if (led.minY_frac > led.maxY_frac)
-				{
-					std::swap(led.minY_frac, led.maxY_frac);
-				}
-
-				// Get the order of the rgb channels for this led (default is device order)
-				led.colorOrder = stringToColorOrder(index["colorOrder"].toString(deviceOrderStr));
-				ledString.leds().push_back(led);
-			}
+			// Get the order of the rgb channels for this led (default is device order)
+			led.colorOrder = stringToColorOrder(ledConfig["colorOrder"].toString(deviceOrderStr));
+			ledString.leds().push_back(led);
 		}
-
-		// Make sure the leds are sorted (on their indices)
-		std::sort(ledString.leds().begin(), ledString.leds().end(), [](const Led& lhs, const Led& rhs){ return lhs.index < rhs.index; });
-		return ledString;
-	}
-
-	LedString createLedStringClone(const QJsonArray& ledConfigArray, const ColorOrder deviceOrder)
-	{
-		LedString ledString;
-		const QString deviceOrderStr = colorOrderToString(deviceOrder);
-		int maxLedId = ledConfigArray.size();
-
-		for (signed i = 0; i < ledConfigArray.size(); ++i)
-		{
-			const QJsonObject& index = ledConfigArray[i].toObject();
-
-			Led led;
-			led.index = index["index"].toInt();
-			led.clone = index["clone"].toInt(-1);
-			if ( led.clone < -1 || led.clone >= maxLedId )
-			{
-				//Warning(_log, "LED %d: clone index of %d is out of range, clone ignored", led.index, led.clone);
-				led.clone = -1;
-			}
-
-			if ( led.clone >= 0 )
-			{
-				//Debug(_log, "LED %d: clone from led %d", led.index, led.clone);
-				led.minX_frac = 0;
-				led.maxX_frac = 0;
-				led.minY_frac = 0;
-				led.maxY_frac = 0;
-				// Get the order of the rgb channels for this led (default is device order)
-				led.colorOrder = stringToColorOrder(index["colorOrder"].toString(deviceOrderStr));
-
-				ledString.leds().push_back(led);
-			}
-
-		}
-
-		// Make sure the leds are sorted (on their indices)
-		std::sort(ledString.leds().begin(), ledString.leds().end(), [](const Led& lhs, const Led& rhs){ return lhs.index < rhs.index; });
 		return ledString;
 	}
 
@@ -282,30 +205,26 @@ namespace hyperion {
 
 		for (signed i = 0; i < ledConfigArray.size(); ++i)
 		{
-			const QJsonObject& index = ledConfigArray[i].toObject();
+			const QJsonObject& ledConfig = ledConfigArray[i].toObject();
 
-			if (index["clone"].toInt(-1) < 0 )
+			double minX_frac = qMax(0.0, qMin(1.0, ledConfig["hmin"].toDouble()));
+			double maxX_frac = qMax(0.0, qMin(1.0, ledConfig["hmax"].toDouble()));
+			double minY_frac = qMax(0.0, qMin(1.0, ledConfig["vmin"].toDouble()));
+			double maxY_frac = qMax(0.0, qMin(1.0, ledConfig["vmax"].toDouble()));
+			// Fix if the user swapped min and max
+			if (minX_frac > maxX_frac)
 			{
-				const QJsonObject& hscanConfig = ledConfigArray[i].toObject()["hscan"].toObject();
-				const QJsonObject& vscanConfig = ledConfigArray[i].toObject()["vscan"].toObject();
-				double minX_frac = qMax(0.0, qMin(1.0, hscanConfig["minimum"].toDouble()));
-				double maxX_frac = qMax(0.0, qMin(1.0, hscanConfig["maximum"].toDouble()));
-				double minY_frac = qMax(0.0, qMin(1.0, vscanConfig["minimum"].toDouble()));
-				double maxY_frac = qMax(0.0, qMin(1.0, vscanConfig["maximum"].toDouble()));
-				// Fix if the user swapped min and max
-				if (minX_frac > maxX_frac)
-				{
-					std::swap(minX_frac, maxX_frac);
-				}
-				if (minY_frac > maxY_frac)
-				{
-					std::swap(minY_frac, maxY_frac);
-				}
-
-				// calculate mid point and make grid calculation
-				midPointsX.push_back( int(1000.0*(minX_frac + maxX_frac) / 2.0) );
-				midPointsY.push_back( int(1000.0*(minY_frac + maxY_frac) / 2.0) );
+				std::swap(minX_frac, maxX_frac);
 			}
+			if (minY_frac > maxY_frac)
+			{
+				std::swap(minY_frac, maxY_frac);
+			}
+
+			// calculate mid point and make grid calculation
+			midPointsX.push_back( int(1000.0*(minX_frac + maxX_frac) / 2.0) );
+			midPointsY.push_back( int(1000.0*(minY_frac + maxY_frac) / 2.0) );
+
 		}
 
 		// remove duplicates
@@ -314,8 +233,21 @@ namespace hyperion {
 		std::sort(midPointsY.begin(), midPointsY.end());
 		midPointsY.erase(std::unique(midPointsY.begin(), midPointsY.end()), midPointsY.end());
 
-		QSize gridSize( midPointsX.size(), midPointsY.size() );
-		//Debug(_log, "led layout grid: %dx%d", gridSize.width(), gridSize.height());
+		QSize gridSize( static_cast<int>(midPointsX.size()), static_cast<int>(midPointsY.size()) );
+
+		// Correct the grid in case it is malformed in width vs height
+		// Expected is at least 50% of width <-> height
+		if((gridSize.width() / gridSize.height()) > 2)
+			gridSize.setHeight(qMax(1,gridSize.width()/2));
+		else if((gridSize.width() / gridSize.height()) < 0.5)
+			gridSize.setWidth(qMax(1,gridSize.height()/2));
+
+		// Limit to 80px for performance reasons
+		const int pl = 80;
+		if(gridSize.width() > pl || gridSize.height() > pl)
+		{
+			gridSize.scale(pl, pl, Qt::KeepAspectRatio);
+		}
 
 		return gridSize;
 	}

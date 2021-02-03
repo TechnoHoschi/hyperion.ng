@@ -69,13 +69,15 @@ $(document).ready( function() {
 			}
 		});
 
+		var instancename = window.currentHyperionInstanceName;
+
 		$('#dash_statush').html(hyperion_enabled ? '<span style="color:green">'+$.i18n('general_btn_on')+'</span>' : '<span style="color:red">'+$.i18n('general_btn_off')+'</span>');
-		$('#btn_hsc').html(hyperion_enabled ? '<button class="btn btn-sm btn-danger" onClick="requestSetComponentState(\'ALL\',false)">'+$.i18n('dashboard_infobox_label_disableh')+'</button>' : '<button class="btn btn-sm btn-success" onClick="requestSetComponentState(\'ALL\',true)">'+$.i18n('dashboard_infobox_label_enableh')+'</button>');
+		$('#btn_hsc').html(hyperion_enabled ? '<button class="btn btn-sm btn-danger" onClick="requestSetComponentState(\'ALL\',false)">'+$.i18n('dashboard_infobox_label_disableh', instancename)+'</button>' : '<button class="btn btn-sm btn-success" onClick="requestSetComponentState(\'ALL\',true)">'+$.i18n('dashboard_infobox_label_enableh', instancename)+'</button>');
 	}
 
 	// add more info
-	$('#dash_leddevice').html(window.serverInfo.ledDevices.active);
-	$('#dash_currv').html(window.currentChannel+' '+window.currentVersion);
+	$('#dash_leddevice').html(window.serverConfig.device.type);
+	$('#dash_currv').html(window.currentVersion);
 	$('#dash_instance').html(window.currentHyperionInstanceName);
 	$('#dash_ports').html(window.serverConfig.flatbufServer.port+' | '+window.serverConfig.protoServer.port);
 	$('#dash_watchedversionbranch').html(window.serverConfig.general.watchedVersionBranch);
@@ -83,17 +85,14 @@ $(document).ready( function() {
 	getReleases(function(callback){
 		if(callback)
 		{
-			var cleanLatestVersion = window.latestVersion.tag_name.replace(/\./g, '');
-			var cleanCurrentVersion = window.currentVersion.replace(/\./g, '');
+			$('#dash_latev').html(window.latestVersion.tag_name);
 
-			$('#dash_latev').html(window.currentVersion);
-			$('#dash_latev').html(window.latestVersion.tag_name + ' (' + (window.latestVersion.prerelease == true ? "Beta" : "Stable") + ')');
-
-			if ( cleanCurrentVersion < cleanLatestVersion )
-				$('#versioninforesult').html('<div class="bs-callout bs-callout-warning" style="margin:0px">'+$.i18n('dashboard_infobox_message_updatewarning', window.latestVersion.tag_name) + ' (' + (window.latestVersion.prerelease == true ? "Beta" : "Stable") + ')</div>');
+			if (semverLite.gt(window.latestVersion.tag_name, window.currentVersion))
+				$('#versioninforesult').html('<div class="bs-callout bs-callout-warning" style="margin:0px"><a target="_blank" href="' + window.latestVersion.html_url + '">'+$.i18n('dashboard_infobox_message_updatewarning', window.latestVersion.tag_name) + '</a></div>');
 			else
 				$('#versioninforesult').html('<div class="bs-callout bs-callout-success" style="margin:0px">'+$.i18n('dashboard_infobox_message_updatesuccess')+'</div>');
-		}
+
+			}
 	});
 
 
@@ -104,7 +103,7 @@ $(document).ready( function() {
 
 	if(grabbers.indexOf('dispmanx') > -1)
 		html += 'Raspberry Pi';
-	else if(grabbers.indexOf('x11') > -1)
+	else if(grabbers.indexOf('x11') > -1 || grabbers.indexOf('xcb') > -1)
 		html += 'X86';
 	else if(grabbers.indexOf('osx')  > -1)
 		html += 'OSX';

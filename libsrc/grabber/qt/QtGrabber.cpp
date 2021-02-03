@@ -33,12 +33,7 @@ QtGrabber::~QtGrabber()
 
 void QtGrabber::freeResources()
 {
-	// cleanup
-	if (_screen != nullptr)
-	{
-		delete _screen;
-		_screen = nullptr;
-	}
+	// Qt seems to hold the ownership of the QScreen pointers
 }
 
 bool QtGrabber::setupDisplay()
@@ -105,13 +100,23 @@ int QtGrabber::grabFrame(Image<ColorRgb> & image)
 	}
 	QPixmap originalPixmap = _screen->grabWindow(0, _src_x, _src_y, _src_x_max, _src_y_max);
 	QPixmap resizedPixmap = originalPixmap.scaled(_width,_height);
-	QImage img = resizedPixmap.toImage().convertToFormat( QImage::Format_RGB888);
-	memcpy(image.memptr(), img.bits(),(size_t) _width*_height*3);
+	QImage imageFrame = resizedPixmap.toImage().convertToFormat( QImage::Format_RGB888);
+	image.resize(imageFrame.width(), imageFrame.height());
+
+	for (int y=0; y<imageFrame.height(); ++y)
+		for (int x=0; x<imageFrame.width(); ++x)
+		{
+			QColor inPixel(imageFrame.pixel(x,y));
+			ColorRgb & outPixel = image(x,y);
+			outPixel.red   = inPixel.red();
+			outPixel.green = inPixel.green();
+			outPixel.blue  = inPixel.blue();
+		}
 
 	return 0;
 }
 
-int QtGrabber::updateScreenDimensions(const bool& force)
+int QtGrabber::updateScreenDimensions(bool force)
 {
 	if(!_screen)
 		return -1;
@@ -142,7 +147,7 @@ int QtGrabber::updateScreenDimensions(const bool& force)
 	// calculate final image dimensions and adjust top/left cropping in 3D modes
 	switch (_videoMode)
 	{
-	case VIDEO_3DSBS:
+	case VideoMode::VIDEO_3DSBS:
 		_width  = width /2;
 		_height = height;
 		_src_x  = _cropLeft / 2;
@@ -150,7 +155,7 @@ int QtGrabber::updateScreenDimensions(const bool& force)
 		_src_x_max = (_screenWidth / 2) - _cropRight;
 		_src_y_max = _screenHeight - _cropBottom;
 		break;
-	case VIDEO_3DTAB:
+	case VideoMode::VIDEO_3DTAB:
 		_width  = width;
 		_height = height / 2;
 		_src_x  = _cropLeft;
@@ -158,7 +163,7 @@ int QtGrabber::updateScreenDimensions(const bool& force)
 		_src_x_max = _screenWidth - _cropRight;
 		_src_y_max = (_screenHeight / 2) - _cropBottom;
 		break;
-	case VIDEO_2D:
+	case VideoMode::VIDEO_2D:
 	default:
 		_width  = width;
 		_height = height;

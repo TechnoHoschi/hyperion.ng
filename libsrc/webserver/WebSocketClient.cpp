@@ -10,7 +10,7 @@
 #include <QCryptographicHash>
 #include <QJsonObject>
 
-WebSocketClient::WebSocketClient(QtHttpRequest* request, QTcpSocket* sock, const bool& localConnection, QObject* parent)
+WebSocketClient::WebSocketClient(QtHttpRequest* request, QTcpSocket* sock, bool localConnection, QObject* parent)
 	: QObject(parent)
 	, _socket(sock)
 	, _log(Logger::getInstance("WEBSOCKET"))
@@ -25,6 +25,7 @@ WebSocketClient::WebSocketClient(QtHttpRequest* request, QTcpSocket* sock, const
 	// Json processor
 	_jsonAPI = new JsonAPI(client, _log, localConnection, this);
 	connect(_jsonAPI, &JsonAPI::callbackMessage, this, &WebSocketClient::sendMessage);
+	connect(_jsonAPI, &JsonAPI::forceClose, this,[this]() { this->sendClose(CLOSECODE::NORMAL); });
 
 	Debug(_log, "New connection from %s", QSTRING_CSTR(client));
 
@@ -40,9 +41,12 @@ WebSocketClient::WebSocketClient(QtHttpRequest* request, QTcpSocket* sock, const
 
 	_socket->write(QSTRING_CSTR(data), data.size());
 	_socket->flush();
+
+	// Init JsonAPI
+	_jsonAPI->initialize();
 }
 
-void WebSocketClient::handleWebSocketFrame(void)
+void WebSocketClient::handleWebSocketFrame()
 {
 	while (_socket->bytesAvailable())
 	{
@@ -123,7 +127,7 @@ void WebSocketClient::handleWebSocketFrame(void)
 					handleBinaryMessage(_wsReceiveBuffer);
 				}
 					_wsReceiveBuffer.clear();
-					
+
 				}
 			}
 			break;
@@ -219,7 +223,7 @@ void WebSocketClient::sendClose(int status, QString reason)
 		sendBuffer.append(quint8(length));
 	}
 
-	sendBuffer.append(reason);
+	sendBuffer.append(reason.toUtf8());
 
 	_socket->write(sendBuffer);
 	_socket->flush();
@@ -235,7 +239,7 @@ void WebSocketClient::handleBinaryMessage(QByteArray &data)
 	unsigned width      = ((data.at(2) << 8) & 0xFF00) | (data.at(3) & 0xFF);
 	unsigned height     =  imgSize / width;
 
-	if ( ! (imgSize) % width)
+	if ( imgSize % width > 0 )
 	{
 		Error(_log, "data size is not multiple of width");
 		return;

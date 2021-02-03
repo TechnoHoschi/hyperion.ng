@@ -2,9 +2,8 @@
 #include "LedDeviceAtmo.h"
 
 LedDeviceAtmo::LedDeviceAtmo(const QJsonObject &deviceConfig)
-	: ProviderRs232()
+	: ProviderRs232(deviceConfig)
 {
-	_deviceReady = init(deviceConfig);
 }
 
 LedDevice* LedDeviceAtmo::construct(const QJsonObject &deviceConfig)
@@ -14,21 +13,29 @@ LedDevice* LedDeviceAtmo::construct(const QJsonObject &deviceConfig)
 
 bool LedDeviceAtmo::init(const QJsonObject &deviceConfig)
 {
-	ProviderRs232::init(deviceConfig);
+	bool isInitOK = false;
 
-	if (_ledCount != 5)
+	// Initialise sub-class
+	if ( ProviderRs232::init(deviceConfig) )
 	{
-		Error( _log, "%d channels configured. This should always be 5!", _ledCount);
-		return 0;
+		if (_ledCount != 5)
+		{
+			QString errortext = QString ("%1 channels configured. This should always be 5!").arg(_ledCount);
+			this->setInError(errortext);
+			isInitOK = false;
+		}
+		else
+		{
+			_ledBuffer.resize(4 + 5*3); // 4-byte header, 5 RGB values
+			_ledBuffer[0] = 0xFF;       // Startbyte
+			_ledBuffer[1] = 0x00;       // StartChannel(Low)
+			_ledBuffer[2] = 0x00;       // StartChannel(High)
+			_ledBuffer[3] = 0x0F;       // Number of Databytes send (always! 15)
+
+			isInitOK = true;
+		}
 	}
-
-	_ledBuffer.resize(4 + 5*3); // 4-byte header, 5 RGB values
-	_ledBuffer[0] = 0xFF;       // Startbyte
-	_ledBuffer[1] = 0x00;       // StartChannel(Low)
-	_ledBuffer[2] = 0x00;       // StartChannel(High)
-	_ledBuffer[3] = 0x0F;       // Number of Databytes send (always! 15)
-
-	return true;
+	return isInitOK;
 }
 
 int LedDeviceAtmo::write(const std::vector<ColorRgb> &ledValues)

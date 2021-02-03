@@ -40,6 +40,17 @@ function setStorage(item, value, session)
 	}
 }
 
+function removeStorage(item, session)
+{
+	if(storageComp())
+	{
+		if(session === true)
+			sessionStorage.removeItem(item);
+		else
+			localStorage.removeItem(item);
+	}
+}
+
 function debugMessage(msg)
 {
 	if (window.debugMessagesActive)
@@ -51,7 +62,7 @@ function debugMessage(msg)
 function updateSessions()
 {
 	var sess = window.serverInfo.sessions;
-	if (sess.length)
+	if (sess && sess.length)
 	{
 		window.wSess = [];
 		for(var i = 0; i<sess.length; i++)
@@ -94,6 +105,14 @@ function getHashtag()
 function loadContent(event, forceRefresh)
 {
 	var tag;
+
+	var lastSelectedInstance = getStorage('lastSelectedInstance', false);
+
+	if (lastSelectedInstance && (lastSelectedInstance != window.currentHyperionInstance))
+		if (typeof(window.serverInfo.instance[lastSelectedInstance].running) !== 'undefined' && window.serverInfo.instance[lastSelectedInstance].running)
+			instanceSwitch(lastSelectedInstance);
+		else
+			removeStorage('lastSelectedInstance', false);
 
 	if(typeof event != "undefined")
 	{
@@ -154,12 +173,51 @@ function updateHyperionInstanceListing()
 
 		$('#hyperioninstance_'+data[key].instance).off().on("click",function(e){
 			var inst = e.currentTarget.id.split("_")[1]
-			requestInstanceSwitch(inst)
-			window.currentHyperionInstance = inst;
-			window.currentHyperionInstanceName = getInstanceNameByIndex(inst);
-			updateHyperionInstanceListing()
+			instanceSwitch(inst)
 		});
 	}
+}
+
+function initLanguageSelection()
+{
+	// Initialise language selection list with languages supported
+	for (var i = 0; i < availLang.length; i++)
+	{
+		$("#language-select").append('<option value="'+i+'" selected="">'+availLangText[i]+'</option>');
+	}
+
+	var langLocale = storedLang;
+
+	// If no language has been set, resolve browser locale
+	if ( langLocale === 'auto' )
+	{
+		langLocale = $.i18n().locale.substring(0,2);
+	}
+
+	// Resolve text for language code
+	var langText = 'Please Select';
+
+	//Test, if language is supported by hyperion
+	var langIdx = availLang.indexOf(langLocale);
+	if ( langIdx > -1 )
+	{
+		langText = availLangText[langIdx];
+	}
+	else
+	{
+		// If language is not supported by hyperion, try fallback language
+		langLocale = $.i18n().options.fallbackLocale.substring(0,2);	
+		langIdx = availLang.indexOf(langLocale);
+		if ( langIdx > -1 )
+		{
+			langText = availLangText[langIdx];
+		}
+	}
+	//console.log("langLocale: ", langLocale, "langText: ", langText);
+
+	$('#language-select').prop('title', langText);
+	$("#language-select").val(langIdx);
+	$("#language-select").selectpicker("refresh");
 }
 
 function updateUiOnInstance(inst)
@@ -171,11 +229,24 @@ function updateUiOnInstance(inst)
 			$("#hyperion_global_setting_notify").fadeIn("fast");
 		else
 			$("#hyperion_global_setting_notify").attr("style", "display:none");
+
+		$("#dashboard_active_instance_friendly_name").html($.i18n('dashboard_active_instance') + ': ' + window.serverInfo.instance[inst].friendly_name);
+		$("#dashboard_active_instance").removeAttr("style");
 	}
 	else
 	{
 		$("#hyperion_global_setting_notify").fadeOut("fast");
+		$("#dashboard_active_instance").attr("style", "display:none");
 	}
+}
+
+function instanceSwitch(inst)
+{
+	requestInstanceSwitch(inst)
+	window.currentHyperionInstance = inst;
+	window.currentHyperionInstanceName = getInstanceNameByIndex(inst);
+	setStorage('lastSelectedInstance', inst, false)
+	updateHyperionInstanceListing()
 }
 
 function loadContentTo(containerId, fileName)
@@ -272,6 +343,15 @@ function showInfoDialog(type,header,message)
 		$('#id_footer_rename').html('<button type="button" id="id_btn_ok" class="btn btn-success" data-dismiss-modal="#modal_dialog_rename" disabled><i class="fa fa-fw fa-save"></i>'+$.i18n('general_btn_ok')+'</button>');
 		$('#id_footer_rename').append('<button type="button" class="btn btn-danger" data-dismiss="modal"><i class="fa fa-fw fa-close"></i>'+$.i18n('general_btn_cancel')+'</button>');
 	}
+	else if (type == "changePassword")
+	{
+		$('#id_body_rename').html('<i style="margin-bottom:20px" class="fa fa-key modal-icon-edit"><br>');
+		$('#id_body_rename').append('<h4>'+header+'</h4>');
+		$('#id_body_rename').append('<input class="form-control" id="oldPw" placeholder="Old" type="text"> <br />');
+		$('#id_body_rename').append('<input class="form-control" id="newPw" placeholder="New" type="text">');
+		$('#id_footer_rename').html('<button type="button" id="id_btn_ok" class="btn btn-success" data-dismiss-modal="#modal_dialog_rename" disabled><i class="fa fa-fw fa-save"></i>'+$.i18n('general_btn_ok')+'</button>');
+		$('#id_footer_rename').append('<button type="button" class="btn btn-danger" data-dismiss="modal"><i class="fa fa-fw fa-close"></i>'+$.i18n('general_btn_cancel')+'</button>');
+	}
 	else if (type == "checklist")
 	{
 		$('#id_body').html('<img style="margin-bottom:20px" src="img/hyperion/hyperionlogo.png" alt="Redefine ambient light!">');
@@ -301,7 +381,7 @@ function showInfoDialog(type,header,message)
 		$('#id_body').append('<select id="id_select" class="form-control" style="margin-top:10px;width:auto;"></select>');
 
 
-	$(type == "renInst" ? "#modal_dialog_rename" : "#modal_dialog").modal({
+	$(type == "renInst" || type == "changePassword" ? "#modal_dialog_rename" : "#modal_dialog").modal({
 		backdrop : "static",
 		keyboard: false,
 		show: true
@@ -309,7 +389,7 @@ function showInfoDialog(type,header,message)
 
 	$(document).on('click', '[data-dismiss-modal]', function () {
 		var target = $(this).attr('data-dismiss-modal');
-		$(target).modal('hide');
+		$.find(target).modal.hide();
 	});
 }
 
@@ -392,11 +472,11 @@ function readImg(input,cb)
 {
     if (input.files && input.files[0]) {
         var reader = new FileReader();
+		// inject fileName property
+		reader.fileName = input.files[0].name
 
         reader.onload = function (e) {
-			var i = new Image();
-			i.src = e.target.result;
-			cb(i.src,i.width,i.height);
+			cb(e.target.result, e.target.fileName);
         }
         reader.readAsDataURL(input.files[0]);
     }
@@ -453,7 +533,7 @@ function createJsonEditor(container,schema,setconfig,usePanel,arrayre)
 	{
 		for(var key in editor.root.editors)
 		{
-			editor.getEditor("root."+key).setValue( window.serverConfig[key] );
+			editor.getEditor("root."+key).setValue(Object.assign({}, editor.getEditor("root."+key).value, window.serverConfig[key] ));
 		}
 	}
 
@@ -509,8 +589,9 @@ function hexToRgb(hex) {
 	@param type     Valid types are "info","success","warning","danger"
 	@param message  The message to show
 	@param title     A title (optional)
+	@param addhtml   Add custom html to the notification end
  */
-function showNotification(type, message, title="")
+function showNotification(type, message, title="", addhtml="")
 {
 	if(title == "")
 	{
@@ -539,15 +620,19 @@ function showNotification(type, message, title="")
 		// settings
 		type: type,
 		animate: {
-			enter: 'animated fadeInRight',
-			exit: 'animated fadeOutRight'
+			enter: 'animated fadeInDown',
+			exit: 'animated fadeOutUp'
+		},
+		placement:{
+			align:'center'
 		},
 		mouse_over : 'pause',
-		template: '<div data-notify="container" class="bg-w col-xs-11 col-sm-3 bs-callout bs-callout-{0}" role="alert">' +
+		template: '<div data-notify="container" class="bg-w col-md-6 bs-callout bs-callout-{0}" role="alert">' +
 		'<button type="button" aria-hidden="true" class="close" data-notify="dismiss">×</button>' +
 		'<span data-notify="icon"></span> ' +
 		'<h4 data-notify="title">{1}</h4> ' +
 		'<span data-notify="message">{2}</span>' +
+		addhtml+
 		'<div class="progress" data-notify="progressbar">' +
 			'<div class="progress-bar progress-bar-{0}" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div>' +
 		'</div>' +
@@ -827,38 +912,85 @@ function getReleases(callback)
 	    success: function(releases)
 			{
 				window.gitHubVersionList = releases;
+				var highestRelease = {
+					tag_name: '0.0.0'
+				};
+				var highestAlphaRelease = {
+					tag_name: '0.0.0'
+				};
+				var highestBetaRelease = {
+					tag_name: '0.0.0'
+				};
+				var highestRcRelease = {
+					tag_name: '0.0.0'
+				};
 
-				for(var i in releases)
-				{
-					if(releases[i].prerelease == true)
+				for(var i in releases) {
+
+					//drafts will be ignored
+					if(releases[i].draft)
+						continue;
+
+					if(releases[i].tag_name.includes('alpha'))
 					{
-						window.latestBetaVersion = releases[i];
-						break;
+						if (sem = semverLite.gt(releases[i].tag_name, highestAlphaRelease.tag_name))
+							highestAlphaRelease = releases[i];
+					}
+					else if (releases[i].tag_name.includes('beta'))
+					{
+						if (sem = semverLite.gt(releases[i].tag_name, highestBetaRelease.tag_name))
+							highestBetaRelease = releases[i];
+					}
+					else if (releases[i].tag_name.includes('rc'))
+					{
+						if (semverLite.gt(releases[i].tag_name, highestRcRelease.tag_name))
+							highestRcRelease = releases[i];
+					}
+					else
+					{
+						if (semverLite.gt(releases[i].tag_name, highestRelease.tag_name))
+							highestRelease = releases[i];
 					}
 				}
+				window.latestStableVersion = highestRelease;
+				window.latestBetaVersion = highestBetaRelease;
+				window.latestAlphaVersion= highestAlphaRelease;
+				window.latestRcVersion = highestRcRelease;
 
-				$.ajax({
-			    url: window.gitHubReleaseApiUrl + "/latest",
-			    method: 'get',
-			    error: function(XMLHttpRequest, textStatus, errorThrown)
-					{
-							callback(false);
-			    },
-			    success: function(latest)
-					{
-						window.latestStableVersion = latest;
 
-						if(window.serverConfig.general.watchedVersionBranch == "Beta" && window.latestStableVersion.tag_name.replace(/\./g, '') <= window.latestBetaVersion.tag_name.replace(/\./g, ''))
-						{
-							window.latestVersion = window.latestBetaVersion;
-						}
-						else
-						{
-							window.latestVersion = window.latestStableVersion;
-						}
-						callback(true);
-					}
-				});
+				if(window.serverConfig.general.watchedVersionBranch == "Beta" && semverLite.gt(highestBetaRelease.tag_name, highestRelease.tag_name))
+					window.latestVersion = highestBetaRelease;
+				else
+					window.latestVersion = highestRelease;
+
+				if(window.serverConfig.general.watchedVersionBranch == "Alpha" && semverLite.gt(highestAlphaRelease.tag_name, highestBetaRelease.tag_name))
+					window.latestVersion = highestAlphaRelease;
+
+				if(window.serverConfig.general.watchedVersionBranch == "Alpha" && semverLite.lt(highestAlphaRelease.tag_name, highestBetaRelease.tag_name))
+					window.latestVersion = highestBetaRelease;
+
+				//next two if statements are only necessary if we don't have a beta or stable release. We need one alpha release at least
+				if(window.latestVersion.tag_name == '0.0.0' && highestBetaRelease.tag_name != '0.0.0')
+					window.latestVersion = highestBetaRelease;
+
+				if(window.latestVersion.tag_name == '0.0.0' && highestAlphaRelease.tag_name != '0.0.0')
+					window.latestVersion = highestAlphaRelease;
+
+				callback(true);
+
 			}
-	})
+	});
+}
+
+function handleDarkMode()
+{
+		$("<link/>", {
+			rel: "stylesheet",
+			type: "text/css",
+			href: "../css/darkMode.css"
+		}).appendTo("head");
+
+		setStorage("darkMode", "on", false);
+		$('#btn_darkmode_icon').removeClass('fa fa-moon-o');
+		$('#btn_darkmode_icon').addClass('fa fa-sun-o');
 }
